@@ -33,13 +33,13 @@ def init_plugin():
 
     # Addtional initilisation code
     global logger,flights
-    logger = datalog.crelog('FUELLOG',None,header)
+    logger = datalog.crelog('FUEL',None,header)
     flights = list()
 
     # Configuration parameters
     config = {
         # The name of your plugin
-        'plugin_name':     'AREA',
+        'plugin_name':     'FUELLOG',
 
         # The type of this plugin. For now, only simulation plugins are possible.
         'plugin_type':     'sim',
