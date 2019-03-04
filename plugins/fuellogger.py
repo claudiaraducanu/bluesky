@@ -19,11 +19,12 @@ header = \
     "Call sign [-], " + \
     "Spawn Time [s], " + \
     "Flight time [s], " + \
+    "Distance 2D [m], " + \
     "Initial Mass [kg], " + \
     "Actual Mass [kg], " + \
     "Fuel consumption [kg], " + \
     "Work [J], " + \
-    "Fuel consumption thrust [kg]""\n"
+    "Fuel consumption using work[kg]""\n"
 
 # Global data
 logger = None
@@ -80,6 +81,7 @@ class FuelLogger(TrafficArrays):
             self.create_time = np.array([])
             self.initial_mass = np.array([])
             self.work = np.array([])
+            self.distance2D = np.array([])
 
     def create(self, n=1):
         super(FuelLogger, self).create(n)
@@ -95,6 +97,7 @@ class FuelLogger(TrafficArrays):
             return
 
         resultantspd = np.sqrt(traf.gs * traf.gs + traf.vs * traf.vs)
+        self.distance2D += self.dt * traf.gs
 
         if settings.performance_model == 'openap':
             self.work += (traf.perf.thrust * self.dt * resultantspd)
@@ -112,11 +115,12 @@ class FuelLogger(TrafficArrays):
                 np.array(traf.id)[wptisdestitnation],
                 self.create_time[wptisdestitnation],
                 sim.simt - self.create_time[wptisdestitnation],
+                self.distance2D[wptisdestitnation],
                 self.initial_mass[wptisdestitnation],
                 traf.perf.mass[wptisdestitnation],
                 self.initial_mass[wptisdestitnation] - traf.perf.mass[wptisdestitnation],
                 self.work[wptisdestitnation],
-                self.work[wptisdestitnation]/(42.8*1000)
+                self.work[wptisdestitnation]/(42.8*1000000)
             )
             # delete all aicraft in self.delidx
             traf.delete(wptisdestitnation)
