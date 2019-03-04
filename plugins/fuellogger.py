@@ -1,6 +1,4 @@
-""" BlueSky deletion area plugin. This plugin can use an area definition to
-    delete aircraft that exit the area. Statistics on these flights can be
-    logged with the FLSTLOG logger. """
+""" BlueSky fuel consumption plugin. """
 import numpy as np
 import math
 # Import the global bluesky objects. Uncomment the ones you need
@@ -13,7 +11,7 @@ from bluesky import settings
 # Log parameters for the flight statistics log
 header = \
     "#######################################################\n" + \
-    "FLST LOG\n" + \
+    "FUEL LOG\n" + \
     "Flight Statistics\n" + \
     "#######################################################\n\n" + \
     "Parameters [Units]:\n" + \
