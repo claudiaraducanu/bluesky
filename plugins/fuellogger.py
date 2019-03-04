@@ -21,7 +21,9 @@ header = \
     "Flight time [s], " + \
     "Initial Mass [kg], " + \
     "Actual Mass [kg], " + \
-    "Fuel consumption [kg], " + "\n"
+    "Fuel consumption [kg], " + \
+    "Work [J], " + \
+    "Fuel consumption thrust [kg]""\n"
 
 # Global data
 logger = None
@@ -77,6 +79,7 @@ class FuelLogger(TrafficArrays):
             self.at_destination      = np.array([],dtype = np.bool) # At destination or not
             self.create_time = np.array([])
             self.initial_mass = np.array([])
+            self.work = np.array([])
 
     def create(self, n=1):
         super(FuelLogger, self).create(n)
@@ -90,6 +93,13 @@ class FuelLogger(TrafficArrays):
 
         if not self.active:
             return
+
+        resultantspd = np.sqrt(traf.gs * traf.gs + traf.vs * traf.vs)
+
+        if settings.performance_model == 'openap':
+            self.work += (traf.perf.thrust * self.dt * resultantspd)
+        else:
+            self.work += (traf.perf.Thr * self.dt * resultantspd)
 
         self.at_destination = np.isclose(traf.lat,traf.actwp.lat,rtol=0.01) & np.isclose(traf.lon,traf.actwp.lon,rtol=0.01)
         wptisdestitnation = np.where(self.at_destination)[0]
@@ -105,6 +115,8 @@ class FuelLogger(TrafficArrays):
                 self.initial_mass[wptisdestitnation],
                 traf.perf.mass[wptisdestitnation],
                 self.initial_mass[wptisdestitnation] - traf.perf.mass[wptisdestitnation],
+                self.work[wptisdestitnation],
+                self.work[wptisdestitnation]/(42.8*1000)
             )
             # delete all aicraft in self.delidx
             traf.delete(wptisdestitnation)
