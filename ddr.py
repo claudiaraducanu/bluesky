@@ -20,17 +20,11 @@ if __name__ == "__main__":
                 print("Successfully loaded trajectory: ", name)
         print()
 
-    # scn_type = input(' Enter type of scenario file \n options are individual (idv)/ aggregated (agg)): ')
 
     cre_functions = trajectories.initiate_aircraft()
     dest_functions = trajectories.add_destination()
     addwpt_functions = trajectories.add_all_wpt()
 
-    # if scn_type == "idv":
-    #
-    #
-    #
-    # elif scn_type == "agg":
 
     with open(os.path.join(scn_trajectory_path, 'aggregated_' + str(datetime.datetime.now()) + '.scn'),
               'w') as scenario:
@@ -42,3 +36,4 @@ if __name__ == "__main__":
     print("Successfully created scenario file")
     # else:
     #     ValueError("Excepted values are idv/agg")
+
