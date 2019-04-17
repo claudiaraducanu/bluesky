@@ -84,7 +84,7 @@ class trajectories():
     @staticmethod
     def _avg_spd(wpt1,wpt2):
         hdg, dist = geo.qdrdist(wpt1['st_x(gpt.coords)'],
-                                wpt1['st_x(gpt.coords)'],
+                                wpt1['st_y(gpt.coords)'],
                                 wpt2['st_x(gpt.coords)'],
                                 wpt2['st_y(gpt.coords)'])
 
