@@ -144,11 +144,14 @@ class trajectories():
             for i in range(2,len(self.data[key])-1):
                 record = self._get_waypoint(key,type='wpt',order=i)
 
-                wpt_functions.append('0:00:00.00>ADDWPT ' + \
-                             key_dictionary['acid'] + ' ' + \
-                             str(record['st_x(gpt.coords)']) + ' ' + \
-                             str(record['st_y(gpt.coords)']) +  ' ' + \
-                             str(record['fl']) + '00' + '\n')
+                wpt_functions.append( '0:00:00.00>DEFWPT ' + 'fix_' + str(i) + ' ' + \
+                                        str(record['st_x(gpt.coords)']) + ' ' + \
+                                        str(record['st_y(gpt.coords)']) +  ' ' + \
+                                        'FIX\n' + \
+                                        '0:00:00.00>ADDWPT ' + \
+                                         key_dictionary['acid'] + ' ' + \
+                                        'fix_' + str(i) + ' ' + \
+                                        str(record['fl']) + '00' + '\n')
 
             self.scn[key]['addwpt_functions'] = wpt_functions
 
