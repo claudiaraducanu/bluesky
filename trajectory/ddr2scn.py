@@ -134,7 +134,6 @@ class trajectories():
         :return:
         """
 
-
         for key in self.data:
 
             key_dictionary = self.key_to_dict(key)
