@@ -17,16 +17,14 @@ header = \
     "Flight Statistics\n" + \
     "#######################################################\n\n" + \
     "Parameters [Units]:\n" + \
-    "Deletion Time [s], " + \
+    "Simulation time [s], " + \
     "Call sign [-], " + \
-    "Spawn Time [s], " + \
-    "Flight time [s], " + \
-    "Distance 2D [m], " + \
-    "Initial Mass [kg], " + \
+    "Latitude [deg], " + \
+    "Longitude [deg], " + \
+    "Altitude [m], " + \
     "Actual Mass [kg], " + \
-    "Fuel consumption [kg], " + \
-    "Work [J], " + \
-    "Fuel consumption using work[kg]""\n"
+    "Active Way-poiny lat, " + \
+    "Active Way-point lon""\n"
 
 logger = None
 ### Initialization function of your plugin. Do not change the name of this
@@ -103,14 +101,15 @@ class FuelLogger(TrafficArrays):
 
         # The FLST logger
 
-        self.logger = datalog.crelog('FUEL', None, header)
+        self.logger = datalog.crelog('FUEL', None, header) # Start a non-periodic logger
+
+        # Make logger track information at way-points
 
         with RegisterElementParameters(self):
-            self.at_destination      = np.array([],dtype = np.bool) # At destination or not
+            self.at_wpt       = np.array([],dtype = np.bool) # At next active way-point
+            self.at_destination      = np.array([],dtype = np.bool) # At destination
             self.create_time = np.array([])
             self.initial_mass = np.array([])
-            self.work = np.array([])
-            self.distance2D = np.array([])
 
     def create(self, n=1):
         super(FuelLogger, self).create(n)
@@ -125,33 +124,23 @@ class FuelLogger(TrafficArrays):
         if not self.active:
             return
 
-        resultantspd = np.sqrt(traf.gs * traf.gs + traf.vs * traf.vs)
-        self.distance2D += self.dt * traf.gs
-
-        if settings.performance_model == 'openap':
-            self.work += (traf.perf.thrust * self.dt * resultantspd)
-        else:
-            self.work += (traf.perf.Thr * self.dt * resultantspd)
-
-        self.at_destination = np.isclose(traf.lat,traf.actwp.lat,rtol=0.01) & np.isclose(traf.lon,traf.actwp.lon,rtol=0.01)
-        wptisdestitnation = np.where(self.at_destination)[0]
+        print("Something should change here")
+        print(traf.actwp.lat)
+        print(traf.actwp.lon)
+        self.at_wpt = np.isclose(traf.lat,traf.actwp.lat,rtol=0.001) \
+                              & np.isclose(traf.lon,traf.actwp.lon,rtol=0.001)
+        ac_at_wpt = np.where(self.at_wpt)
 
         # Log flight statistics when for aircraft at destination
-        if len(wptisdestitnation) > 0:
+        if len(ac_at_wpt) > 0:
 
             self.logger.log(
-                np.array(traf.id)[wptisdestitnation],
-                self.create_time[wptisdestitnation],
-                sim.simt - self.create_time[wptisdestitnation],
-                self.distance2D[wptisdestitnation],
-                self.initial_mass[wptisdestitnation],
-                traf.perf.mass[wptisdestitnation],
-                self.initial_mass[wptisdestitnation] - traf.perf.mass[wptisdestitnation],
-                self.work[wptisdestitnation],
-                self.work[wptisdestitnation]/(42.8*1000000)
+                np.array(traf.id)[ac_at_wpt],
+                np.array(traf.perf.mass)[ac_at_wpt],
             )
+
             # delete all aicraft in self.delidx
-            traf.delete(wptisdestitnation)
+        # traf.delete(wptisdestitnation)
 
     def set(self, *args):
         ''' Set Experiment Area. Aicraft leaving the experiment area are deleted.
