@@ -3,28 +3,27 @@
 from bluesky import stack  #, settings, navdb, traf, sim, scr, tools
 
 import numpy as np
+import csv
+from datetime import datetime
 # Import the global bluesky objects. Uncomment the ones you need
-from bluesky import traf, sim #, settings, navdb, traf, sim, scr, tools
+from bluesky import traf, sim, stack #, settings, navdb, traf, sim, scr, tools
 from bluesky.tools import datalog, areafilter, \
     TrafficArrays, RegisterElementParameters
 from bluesky import settings
+# Register settings defaults
+settings.set_variable_defaults(log_path='output')
 
 # frequent updates provide an update interval.
 
-header = \
-    "#######################################################\n" + \
-    "FUEL LOG\n" + \
-    "Flight Statistics\n" + \
-    "#######################################################\n\n" + \
-    "Parameters [Units]:\n" + \
-    "Simulation time [s], " + \
-    "Call sign [-], " + \
-    "Latitude [deg], " + \
-    "Longitude [deg], " + \
-    "Altitude [m], " + \
-    "Actual Mass [kg], " + \
-    "Active Way-poiny lat, " + \
-    "Active Way-point lon""\n"
+csv_header = \
+    ["Simulation time [s] ",
+    "Call sign [-] ",
+    "Latitude [deg] ",
+    "Longitude [deg] ",
+    "Altitude [m] ",
+    "Actual Mass [kg] ",
+    "Active Way-poiny lat ",
+    "Active Way-point lon"] \
 
 logger = None
 ### Initialization function of your plugin. Do not change the name of this
@@ -97,54 +96,46 @@ class FuelLogger(TrafficArrays):
         # Parameters of area
         self.active = False
         self.dt     = 0.1     # [s] frequency of area check (simtime)
-        self.name   = None
 
-        # The FLST logger
 
-        self.logger = datalog.crelog('FUEL', None, header) # Start a non-periodic logger
-
-        # Make logger track information at way-points
+        self.file   = None
+        self.csv_writer = None
+        self.header = csv_header
 
         with RegisterElementParameters(self):
-            self.at_wpt       = np.array([],dtype = np.bool) # At next active way-point
-            self.at_destination      = np.array([],dtype = np.bool) # At destination
-            self.create_time = np.array([])
-            self.initial_mass = np.array([])
-
-    def create(self, n=1):
-        super(FuelLogger, self).create(n)
-        self.create_time[-n:] = sim.simt
-        self.initial_mass[-n:] = traf.perf.mass[-n:]
-
+            self.at_wpt                 = np.array([],dtype = np.bool) # At next active way-point
 
     def update(self):
         """Find out which aircraft are currently at their destination, and
         determine which aircraft need to be deleted."""
 
         if not self.active:
-            return
+            pass
 
-        print("Something should change here")
-        print(traf.actwp.lat)
-        print(traf.actwp.lon)
-        self.at_wpt = np.isclose(traf.lat,traf.actwp.lat,rtol=0.001) \
-                              & np.isclose(traf.lon,traf.actwp.lon,rtol=0.001)
-        ac_at_wpt = np.where(self.at_wpt)
+        self.at_wpt = np.isclose(traf.lat,traf.actwp.lat,rtol=0.0001) \
+                              & np.isclose(traf.lon,traf.actwp.lon,rtol=0.0001)
+        ac_at_wpt        = np.where(self.at_wpt)[0]
 
-        # Log flight statistics when for aircraft at destination
         if len(ac_at_wpt) > 0:
+            condition = np.isclose(float(traf.ap.dest[0].split(',')[0]), traf.actwp.lat, rtol=0.0001) \
+                        & np.isclose(float(traf.ap.dest[0].split(',')[1]), traf.actwp.lon, rtol=0.0001)
 
-            self.logger.log(
-                np.array(traf.id)[ac_at_wpt],
-                np.array(traf.perf.mass)[ac_at_wpt],
-            )
-
-            # delete all aicraft in self.delidx
-        # traf.delete(wptisdestitnation)
+            for idx in ac_at_wpt:
+                self.csv_writer(
+                    [sim.simt, traf.id[idx],
+                     traf.lat[idx],
+                     traf.lon[idx],
+                     traf.alt[idx],
+                     traf.perf.mass[idx],
+                     traf.actwp.lat[idx],
+                     traf.actwp.lon[idx]]
+                )
+                if condition:
+                    traf.delete(idx)
+            if condition:
+                self.set("OFF")
 
     def set(self, *args):
-        ''' Set Experiment Area. Aicraft leaving the experiment area are deleted.
-        Input can be exisiting shape name, or a box with optional altitude constrainsts.'''
 
         # if all args are empty, then print out the current area status
         if not args:
@@ -152,16 +143,36 @@ class FuelLogger(TrafficArrays):
         elif isinstance(args[0],bool):
             if args[0]:
                 self.active = True
-                self.logger.start()
-                return True, "LOG logging is : " + str(self.active)
+                self.start()
+                return True, "LOG logging is : " + str(args[0])
             else:
                 # switch off fuel logging
-                self.logger.reset()
                 self.active = False
-                return True, "LOG is switched : " + str(self.active)
+                self.reset()
+                return True, "LOG is switched : " + str(args[0])
         else:
             return False,  "Incorrect arguments" + \
                            "\nLOG ON/OFF "
+
+    def start(self):
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H-%M-%S')
+        flname     = "%s_%s_%s.csv" % ('FUEL', stack.get_scenname(), timestamp)
+        fname =  settings.log_path + '/' + flname
+
+        if self.file:
+            self.file.close()
+        self.file       = open(fname, 'w')
+        self.csv_writer = csv.writer(self.file).writerow # Function to write a row in csv
+        # Write the header
+        self.csv_writer(self.header)
+
+    def reset(self):
+        if self.file:
+            self.file.close()
+            self.file   = None
+            self.csv_writer = None
+
 
 def preupdate():
     pass
