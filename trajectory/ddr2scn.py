@@ -115,8 +115,6 @@ class trajectories():
 
     def dest_command(self):
 
-        dest_functions = []
-
         for key in self.data:
 
             key_dictionary = self.key_to_dict(key)
@@ -140,17 +138,27 @@ class trajectories():
             wpt_functions = []
 
             # Loop through all points in DDR2 trajectory exept for the first and last
-            for i in range(2,len(self.data[key])-1):
-                record = self._get_waypoint(key,type='wpt',order=i)
+            for i in range(len(self.data[key])-1):
+                record = self._get_waypoint(key,type='wpt',order=i+1)
 
-                wpt_functions.append( '0:00:00.00>DEFWPT ' + 'fix_' + str(i) + ' ' + \
-                                        str(record['st_x(gpt.coords)']) + ' ' + \
-                                        str(record['st_y(gpt.coords)']) +  ' ' + \
-                                        'FIX\n' + \
-                                        '0:00:00.00>ADDWPT ' + \
-                                         key_dictionary['acid'] + ' ' + \
-                                        'fix_' + str(i) + ' ' + \
-                                        str(record['fl']) + '00' + '\n')
+                defwpt = '0:00:00.00>DEFWPT ' + 'fix_' + str(i+1) + ' ' + \
+                                            str(record['st_x(gpt.coords)']) + ' ' + \
+                                            str(record['st_y(gpt.coords)']) +  ' ' + \
+                                            'FIX\n'
+
+                if i != 0:
+                    addwpt = '0:00:00.00>' + \
+                             key_dictionary['acid'] + ' ' + \
+                             'AFTER ' + 'fix_' + str(i) + ' ADDWPT ' + \
+                             'fix_' + str(i+1) + ' ' + \
+                             str(record['fl']) + '00' + '\n'
+                else:
+                    addwpt =  '0:00:00.00>ADDWPT ' + \
+                             key_dictionary['acid'] + ' ' + \
+                            'fix_' + str(i+1) + ' ' + \
+                             str(record['fl']) + '00' + '\n'
+
+                wpt_functions.append(defwpt + addwpt)
 
             self.scn[key]['addwpt_functions'] = wpt_functions
 

@@ -22,12 +22,14 @@ if __name__ == "__main__":
     trajectories.dest_command()
     trajectories.addwpt_command()
 
-
     for key in trajectories.scn:
 
         with open(os.path.join(scn_trajectory_path, key + '_' + str(datetime.datetime.now()) + '.scn'),
                   'w') as scenario:
+            scenario.write('0:00:00.00>HOLD\n')
             scenario.write(trajectories.scn[key]['cre_function'])
             scenario.write(trajectories.scn[key]['dest_function'])
             for function in trajectories.scn[key]['addwpt_functions']:
                 scenario.write(function)
+            scenario.write("0:00:00.00>" + trajectories.key_to_dict(key)['acid'] + " VNAV ON\n")
+            scenario.write("0:00:00.00>LOG ON\n0:00:00.00>OP")

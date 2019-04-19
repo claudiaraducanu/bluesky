@@ -112,8 +112,8 @@ class FuelLogger(TrafficArrays):
         if not self.active:
             pass
 
-        self.at_wpt = np.isclose(traf.lat,traf.actwp.lat,rtol=0.0001) \
-                              & np.isclose(traf.lon,traf.actwp.lon,rtol=0.0001)
+        self.at_wpt = np.isclose(traf.lat,traf.actwp.lat,rtol=0.00001) \
+                              & np.isclose(traf.lon,traf.actwp.lon,rtol=0.00001)
         ac_at_wpt        = np.where(self.at_wpt)[0]
 
         if len(ac_at_wpt) > 0:
