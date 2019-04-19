@@ -133,7 +133,7 @@ class FuelLogger(TrafficArrays):
                 if condition:
                     traf.delete(idx)
             if condition:
-                self.set("OFF")
+                self.set((False,))
 
     def set(self, *args):
 
@@ -156,9 +156,7 @@ class FuelLogger(TrafficArrays):
 
     def start(self):
 
-        timestamp = datetime.now().strftime('%Y%m%d_%H-%M-%S')
-        flname     = "%s_%s_%s.csv" % ('FUEL', stack.get_scenname(), timestamp)
-        fname =  settings.log_path + '/' + flname
+        fname = datalog.makeLogfileName("FUEL_CSV")
 
         if self.file:
             self.file.close()
