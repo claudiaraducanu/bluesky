@@ -1,7 +1,10 @@
-""" Fuellog: for each aircraft log traffic information when at a waypoint """
-# Import the global bluesky objects. Uncomment the ones you need
+""" BlueSky fuel consumed plugin. This plugin can use to store information on the fuel used by the aircraft. 
+    Statistics on the flight are logged in a data frame
+    when the aircraft reaches a way point along its trajectory. At the end of the trajectory the data frame is stored
+    in a pickle file.
+    This is a condition based logger unlike the standard BlueSky logging tool which is periodic.
+"""# Import the global bluesky objects. Uncomment the ones you need
 from bluesky import stack  #, settings, navdb, traf, sim, scr, tools
-
 import numpy as np
 import pickle
 import os
@@ -15,8 +18,7 @@ from bluesky import settings
 # Register settings defaults
 settings.set_variable_defaults(log_path='output')
 
-# frequent updates provide an update interval.
-
+# The variables to be stored about the flight
 header = \
     ["Simulation time [s] ",
     "Call sign [-] ",
@@ -68,9 +70,9 @@ def init_plugin():
 
     stackfunctions = {
         # The command name for your function
-        'LOG': [
+        'FLOG': [
             # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
-            'LOG ON/OFF',
+            'FLOG ON/OFF',
 
             # A list of the argument types your function accepts. For a description of this, see ...
             '[onoff]',
@@ -120,7 +122,6 @@ class FuelLogger(TrafficArrays):
                               & np.isclose(traf.lon,traf.actwp.lon,rtol=0.0001)
         ac_at_wpt        = np.where(self.at_wpt)[0]
 
-        print(traf.ap.route[0].wpname[traf.ap.route[0].iactwp])
 
         if len(ac_at_wpt) > 0:
             condition = np.isclose(float(traf.ap.dest[0].split(',')[0]), traf.actwp.lat, rtol=0.0001) \
@@ -133,7 +134,7 @@ class FuelLogger(TrafficArrays):
                      traf.lon[idx],
                      traf.alt[idx],
                      traf.perf.mass[idx],
-                     self.initial_mass[idx] - traf.perf.mass[idx],0]],columns=header))
+                     self.initial_mass[idx] - traf.perf.mass[idx],traf.ap.route[0].wpname[traf.ap.route[0].iactwp]]],columns=header))
                 if condition:
                     traf.delete(idx)
             if condition:
@@ -148,7 +149,7 @@ class FuelLogger(TrafficArrays):
             if args[0]:
                 self.active = True
                 self.data_log = pd.DataFrame(columns=header) # dataframe in which logging information is saved
-                return True, "LOG logging is : " + str(args[0])
+                return True, "FLOG logging is : ON"
             else:
                 # switch off fuel logging
                 self.active = False
@@ -160,10 +161,10 @@ class FuelLogger(TrafficArrays):
                     with open(fname, "wb") as f:
                         pickle.dump(self.data_log, f)
 
-                return True, "LOG is switched : " + str(args[0])
+                return True, "FLOG is switched : OFF"
         else:
             return False,  "Incorrect arguments" + \
-                           "\nLOG ON/OFF "
+                           "\nFLOG ON/OFF "
 
 
 def preupdate():
