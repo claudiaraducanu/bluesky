@@ -23,15 +23,15 @@ class trajectories():
 
         date = record['time_over'].split()[0] # Get aircraft day of operation
 
-        return acid + '.' + \
-               ac_type + '.' + \
+        return acid + '_' + \
+               ac_type + '_' + \
                date
 
 
     @staticmethod
     def key_to_dict(key):
 
-        data = key.split(".")
+        data = key.split("_")
         key_dictionary = dict()
 
         key_dictionary['acid'] = data[0]
@@ -49,7 +49,7 @@ class trajectories():
         :return:
         """
 
-        if type == 'org':
+        if type == 'orig':
             wpt = self.data[key].loc[(self.data[key]['order'] == 1)].iloc[0]
             if wpt['type.1'] is not 'A':
                 raise Warning("waypoint selected for origin is not an airport")
@@ -63,7 +63,7 @@ class trajectories():
             else:
                 wpt = self.data[key].loc[self.data[key]['order'] == order].iloc[0]
         else:
-            raise ValueError("Waypoint types are limited to org/dest/wpt")
+            raise ValueError("Waypoint types are limited to orig/dest/wpt")
 
         return wpt
 
@@ -100,7 +100,7 @@ class trajectories():
             self.scn[key] = dict()
 
             key_dictionary = self.key_to_dict(key)
-            origin = self._get_waypoint(key, type="org")
+            origin = self._get_waypoint(key, type="orig")
 
             spd, hdg = self._avg_spd(origin,self._get_waypoint(key, type="wpt",order=2))
 
@@ -124,6 +124,18 @@ class trajectories():
                              key_dictionary['acid'] + ' ' + \
                              str(destination['st_x(gpt.coords)']) + ' ' + \
                              str(destination['st_y(gpt.coords)']) +  '\n'
+
+    def orig_command(self):
+
+        for key in self.data:
+
+            key_dictionary = self.key_to_dict(key)
+            origin = self._get_waypoint(key, type="orig")
+
+            self.scn[key]['orig_function'] = '0:00:00.00>ORIG ' + \
+                             key_dictionary['acid'] + ' ' + \
+                             str(origin['st_x(gpt.coords)']) + ' ' + \
+                             str(origin['st_y(gpt.coords)']) +  '\n'
 
 
     def addwpt_command(self):

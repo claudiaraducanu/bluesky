@@ -3,7 +3,9 @@
 from bluesky import stack  #, settings, navdb, traf, sim, scr, tools
 
 import numpy as np
-import csv
+import pickle
+import os
+import pandas as pd
 from datetime import datetime
 # Import the global bluesky objects. Uncomment the ones you need
 from bluesky import traf, sim, stack #, settings, navdb, traf, sim, scr, tools
@@ -15,15 +17,15 @@ settings.set_variable_defaults(log_path='output')
 
 # frequent updates provide an update interval.
 
-csv_header = \
+header = \
     ["Simulation time [s] ",
     "Call sign [-] ",
     "Latitude [deg] ",
     "Longitude [deg] ",
     "Altitude [m] ",
     "Actual Mass [kg] ",
-    "Active Way-poiny lat ",
-    "Active Way-point lon"] \
+    "Initial Mass - Actual Mass [kg]",
+    "Active Waypoint"] \
 
 logger = None
 ### Initialization function of your plugin. Do not change the name of this
@@ -97,13 +99,15 @@ class FuelLogger(TrafficArrays):
         self.active = False
         self.dt     = 0.1     # [s] frequency of area check (simtime)
 
-
-        self.file   = None
-        self.csv_writer = None
-        self.header = csv_header
+        self.data_log   = None
 
         with RegisterElementParameters(self):
             self.at_wpt                 = np.array([],dtype = np.bool) # At next active way-point
+            self.initial_mass           = np.array([])
+
+    def create(self, n=1):
+        super(FuelLogger, self).create(n)
+        self.initial_mass[-n:] = traf.perf.mass[-n:]
 
     def update(self):
         """Find out which aircraft are currently at their destination, and
@@ -112,24 +116,24 @@ class FuelLogger(TrafficArrays):
         if not self.active:
             pass
 
-        self.at_wpt = np.isclose(traf.lat,traf.actwp.lat,rtol=0.00001) \
-                              & np.isclose(traf.lon,traf.actwp.lon,rtol=0.00001)
+        self.at_wpt = np.isclose(traf.lat,traf.actwp.lat,rtol=0.0001) \
+                              & np.isclose(traf.lon,traf.actwp.lon,rtol=0.0001)
         ac_at_wpt        = np.where(self.at_wpt)[0]
+
+        print(traf.ap.route[0].wpname[traf.ap.route[0].iactwp])
 
         if len(ac_at_wpt) > 0:
             condition = np.isclose(float(traf.ap.dest[0].split(',')[0]), traf.actwp.lat, rtol=0.0001) \
                         & np.isclose(float(traf.ap.dest[0].split(',')[1]), traf.actwp.lon, rtol=0.0001)
 
             for idx in ac_at_wpt:
-                self.csv_writer(
-                    [sim.simt, traf.id[idx],
+                self.data_log.append(pd.DataFrame(
+                    [[sim.simt, traf.id[idx],
                      traf.lat[idx],
                      traf.lon[idx],
                      traf.alt[idx],
                      traf.perf.mass[idx],
-                     traf.actwp.lat[idx],
-                     traf.actwp.lon[idx]]
-                )
+                     self.initial_mass[idx] - traf.perf.mass[idx],0]],columns=header))
                 if condition:
                     traf.delete(idx)
             if condition:
@@ -143,33 +147,23 @@ class FuelLogger(TrafficArrays):
         elif isinstance(args[0],bool):
             if args[0]:
                 self.active = True
-                self.start()
+                self.data_log = pd.DataFrame(columns=header) # dataframe in which logging information is saved
                 return True, "LOG logging is : " + str(args[0])
             else:
                 # switch off fuel logging
                 self.active = False
-                self.reset()
+
+                timestamp = datetime.now().strftime('%Y%m%d_%H-%M-%S')
+                fname = os.path.join(os.getcwd(),settings.log_path,"%s_%s_%s.pkl" %("fuel", stack.get_scenname(), timestamp))
+
+                if self.data_log is not None:
+                    with open(fname, "wb") as f:
+                        pickle.dump(self.data_log, f)
+
                 return True, "LOG is switched : " + str(args[0])
         else:
             return False,  "Incorrect arguments" + \
                            "\nLOG ON/OFF "
-
-    def start(self):
-
-        fname = datalog.makeLogfileName("FUEL_CSV")
-
-        if self.file:
-            self.file.close()
-        self.file       = open(fname, 'w')
-        self.csv_writer = csv.writer(self.file).writerow # Function to write a row in csv
-        # Write the header
-        self.csv_writer(self.header)
-
-    def reset(self):
-        if self.file:
-            self.file.close()
-            self.file   = None
-            self.csv_writer = None
 
 
 def preupdate():

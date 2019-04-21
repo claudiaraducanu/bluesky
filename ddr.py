@@ -20,6 +20,7 @@ if __name__ == "__main__":
 
     trajectories.cre_command()
     trajectories.dest_command()
+    trajectories.orig_command()
     trajectories.addwpt_command()
 
     for key in trajectories.scn:
@@ -28,6 +29,7 @@ if __name__ == "__main__":
                   'w') as scenario:
             scenario.write('0:00:00.00>HOLD\n')
             scenario.write(trajectories.scn[key]['cre_function'])
+            scenario.write(trajectories.scn[key]['orig_function'])
             scenario.write(trajectories.scn[key]['dest_function'])
             for function in trajectories.scn[key]['addwpt_functions']:
                 scenario.write(function)
