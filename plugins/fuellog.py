@@ -25,6 +25,8 @@ header = \
     "Latitude [deg] ",
     "Longitude [deg] ",
     "Altitude [m] ",
+    "Ground Speed [m/s] ",
+    "CAS [m/s] ",
     "Actual Mass [kg] ",
     "Initial Mass - Actual Mass [kg]",
     "Active Waypoint"] \
@@ -128,17 +130,20 @@ class FuelLogger(TrafficArrays):
                         & np.isclose(float(traf.ap.dest[0].split(',')[1]), traf.actwp.lon, rtol=0.0001)
 
             for idx in ac_at_wpt:
-                self.data_log.append(pd.DataFrame(
+                self.data_log = self.data_log.append(pd.DataFrame(
                     [[sim.simt, traf.id[idx],
                      traf.lat[idx],
                      traf.lon[idx],
                      traf.alt[idx],
+                     traf.gs[idx],
+                     traf.cas[idx],
                      traf.perf.mass[idx],
                      self.initial_mass[idx] - traf.perf.mass[idx],traf.ap.route[0].wpname[traf.ap.route[0].iactwp]]],columns=header))
                 if condition:
                     traf.delete(idx)
             if condition:
-                self.set((False,))
+                stack.stack("FLOG OFF")
+                stack.stack("QUIT")
 
     def set(self, *args):
 
@@ -155,7 +160,7 @@ class FuelLogger(TrafficArrays):
                 self.active = False
 
                 timestamp = datetime.now().strftime('%Y%m%d_%H-%M-%S')
-                fname = os.path.join(os.getcwd(),settings.log_path,"%s_%s_%s.pkl" %("fuel", stack.get_scenname(), timestamp))
+                fname = os.path.join(os.getcwd(),settings.log_path,"%s_%s_%s.pkl" %("CONDITIONAL", stack.get_scenname(), timestamp))
 
                 if self.data_log is not None:
                     with open(fname, "wb") as f:

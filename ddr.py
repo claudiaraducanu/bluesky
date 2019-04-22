@@ -53,7 +53,8 @@ if __name__ == "__main__":
                                "0:00:00.00>STANDARD ADD id,lat,lon,alt,traf.perf.mass,traf.ap.route[0].iactwp\n"
                                "0:00:00.00>STANDARD ON\n")
             elif log_type == "conditional":
-                scenario.write("0:00:00.00>FLOG ON\n")
+                scenario.write("0:00:00.00>PLUGINS LOAD FUELLOG \n"
+                               "0:00:00.00>FLOG ON\n")
             else:
                 raise ValueError("Unknown logger type.")
             scenario.write("0:00:00.00>OP")
