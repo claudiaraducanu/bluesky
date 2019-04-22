@@ -33,7 +33,7 @@ class Route:
     calcwp   = 4   # Calculated waypoint (T/C, T/D, A/C)
     runway   = 5   # Runway: Copy name and positions
 
-    def  __init__(self):
+    def __init__(self):
         self.nwp    = 0
 
         # Waypoint data
