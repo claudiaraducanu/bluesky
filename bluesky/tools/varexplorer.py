@@ -3,7 +3,7 @@
     Provide flexible access to simulation data in BlueSky.
 '''
 from numbers import Number
-from collections import OrderedDict
+from collections import OrderedDict, Mapping
 try:
     from collections.abc import Collection
 except ImportError:
@@ -17,6 +17,27 @@ from bluesky.tools import TrafficArrays
 # Globals
 # The variable lists and their corresponding sources
 varlist = OrderedDict()
+
+
+class CaseInsensitiveDict(Mapping):
+    def __init__(self, d):
+        self._d = d
+        self._s = dict((k.lower(), k) for k in d)
+
+    def __contains__(self, k):
+        return k.lower() in self._s
+
+    def __len__(self):
+        return len(self._s)
+
+    def __iter__(self):
+        return iter(self._s)
+
+    def __getitem__(self, k):
+        return self._d[self._s[k.lower()]]
+
+    def actual_key_case(self, k):
+        return self._s.get(k.lower())
 
 
 def init():
@@ -99,8 +120,10 @@ def findvar(varname):
                     break
                 obj = getattr(obj, pair[0], None)
 
-            if obj and name in vars(obj):
-                return Variable(obj, varset[-2][0], name, index)
+            # if obj and name in vars(obj):
+            if obj and name in CaseInsensitiveDict(vars(obj)):
+                # return Variable(obj, varset[-2][0], name, index)
+                return Variable(obj, varset[-2][0], CaseInsensitiveDict(vars(obj)).actual_key_case(name), index)
         else:
             # A parent object is not passed, we only have a variable name
             # this name should exist in Plot.vlist
