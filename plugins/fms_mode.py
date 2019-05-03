@@ -16,6 +16,7 @@ def init_plugin():
 
     # Additional initilisation code
     global afms
+    # global acceleration_standard_m_s2 = 0.5
     afms = Afms()
 
     # Configuration parameters
@@ -205,13 +206,20 @@ class Afms:
                 elif fms_mode == 2:  # AFMS_MODE OWN
                     own_spd = self._current_own_spd(idx)
                     if own_spd < 0:
-                        print('No own speed specified')
+                        # print('No own speed specified')
+                        pass  # Don't do anything
                     elif own_spd < 1:
-                        stack.stack(f'SPD {traf.id[idx]}, {own_spd}')
-                        stack.stack(f'VNAV {traf.id[idx]} ON')
+                        if abs(traf.M[idx] - own_spd) > 0.0003:
+                            stack.stack(f'SPD {traf.id[idx]}, {own_spd}')
+                            stack.stack(f'VNAV {traf.id[idx]} ON')
+                        else:
+                            pass
                     else:
-                        stack.stack(f'SPD {traf.id[idx]}, {own_spd * 3600 / 1852}')
-                        stack.stack(f'VNAV {traf.id[idx]} ON')
+                        if abs(traf.cas[idx] - own_spd) > 0.1:
+                            stack.stack(f'SPD {traf.id[idx]}, {own_spd * 3600 / 1852}')
+                            stack.stack(f'VNAV {traf.id[idx]} ON')
+                        else:
+                            pass
                 elif fms_mode == 3:  # AFMS_MODE RTA
                     rta_init_index, rta_last_index, rta = self._current_rta(idx)
                     time_s2rta = self._time_s2rta(rta)
@@ -224,15 +232,17 @@ class Afms:
                     _, dist2nwp = tools.geo.qdrdist(traf.lat[idx], traf.lon[idx],
                                                     traf.ap.route[idx].wplat[rta_init_index],
                                                     traf.ap.route[idx].wplon[rta_init_index])
-                    distances = np.concatenate((np.array([dist2nwp]),
+                    distances_nm = np.concatenate((np.array([dist2nwp]),
                                                 traf.ap.route[idx].wpdistto[rta_init_index + 1:rta_last_index + 1]),
                                                axis=0)
-                    flightlevels = np.concatenate((np.array([traf.alt[idx]]),
+                    flightlevels_m = np.concatenate((np.array([traf.alt[idx]]),
                                                    traf.ap.route[idx].wpalt[rta_init_index + 1:rta_last_index + 1]))
-                    rta_cas_kts = self._rta_cas_wfl(distances, flightlevels, time_s2rta, traf.cas[idx]) * 3600 / 1852
-
-                    stack.stack(f'SPD {traf.id[idx]}, {rta_cas_kts}')
-                    stack.stack(f'VNAV {traf.id[idx]} ON')
+                    rta_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, time_s2rta, traf.cas[idx]) * 3600 / 1852
+                    if abs(traf.cas[idx] - rta_cas_kts) > 0.1:
+                        stack.stack(f'SPD {traf.id[idx]}, {rta_cas_kts}')
+                        stack.stack(f'VNAV {traf.id[idx]} ON')
+                    else:
+                        pass
                 elif fms_mode == 4:  # AFMS_MODE TW
                     rta_init_index, rta_last_index, rta = self._current_rta(idx)
                     tw_init_index, tw_last_index, tw_size = self._current_tw_size(idx)
@@ -240,16 +250,20 @@ class Afms:
                                                     traf.ap.route[idx].wplat[rta_init_index],
                                                     traf.ap.route[idx].wplon[rta_init_index])
 
-                    distances = np.concatenate((np.array([dist2nwp]),
+                    distances_nm = np.concatenate((np.array([dist2nwp]),
                                                 traf.ap.route[idx].wpdistto[rta_init_index + 1:rta_last_index + 1]),
                                                axis=0)
-                    flightlevels = np.concatenate((np.array([traf.alt[idx]]),
+                    flightlevels_m = np.concatenate((np.array([traf.alt[idx]]),
                                                    traf.ap.route[idx].wpalt[rta_init_index + 1:rta_last_index + 1]))
 
+                    # Calculate Preferred Speed and Preferred Time of Arrival
                     own_spd = self._current_own_spd(idx)
                     if own_spd < 0:
                         # No speed specified. Use current speed
-                        preferred_cas_m_s = traf.cas[idx]
+                        if traf.selspd[idx] > 0:
+                            _, preferred_cas_m_s, _ = tools.aero.vcasormach(traf.selspd[idx])
+                        else:
+                            preferred_cas_m_s = traf.cas[idx]
                     elif own_spd < 1:
                         # Mach speed specified
                         preferred_cas_m_s = tools.aero.vmach2cas(own_spd, traf.alt[idx])
@@ -257,37 +271,45 @@ class Afms:
                         # CAS specified
                         preferred_cas_m_s = own_spd
 
-                    eta_s_preferred = self._eta_wfl(distances, flightlevels, preferred_cas_m_s)
+                    eta_s_preferred = self._eta_wfl(distances_nm, flightlevels_m, preferred_cas_m_s)
+
                     time_s2rta = self._time_s2rta(rta)
+
+                    # Jump to next +1 waypoint when close to next waypoint
                     if eta_s_preferred < self.skip2next_rta_time_s:
+                        #TODO What if there is no next RTA waypoint?
                         rta_init_index, rta_last_index, rta = self._current_rta_plus_one(idx)
                         time_s2rta = self._time_s2rta(rta)
                         _, dist2nwp = tools.geo.qdrdist(traf.lat[idx], traf.lon[idx],
                                                         traf.ap.route[idx].wplat[rta_init_index],
                                                         traf.ap.route[idx].wplon[rta_init_index])
 
-                        distances = np.concatenate((np.array([dist2nwp]),
+                        distances_nm = np.concatenate((np.array([dist2nwp]),
                                                     traf.ap.route[idx].wpdistto[rta_init_index + 1:rta_last_index + 1]),
                                                    axis=0)
-                        flightlevels = np.concatenate((np.array([traf.alt[idx]]),
+                        flightlevels_m = np.concatenate((np.array([traf.alt[idx]]),
                                                        traf.ap.route[idx].wpalt[rta_init_index + 1:rta_last_index + 1]))
 
-                        eta_s_preferred = self._eta_wfl(distances, flightlevels, preferred_cas_m_s)
+                        eta_s_preferred = self._eta_wfl(distances_nm, flightlevels_m, preferred_cas_m_s)
                     else:
                         pass
+
                     earliest_time_s2rta = time_s2rta - tw_size/2
                     latest_time_s2rta = time_s2rta + tw_size/2
+
                     if eta_s_preferred < earliest_time_s2rta:
-                        time_window_cas_kts = self._rta_cas_wfl(distances, flightlevels, earliest_time_s2rta,
+                        time_window_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, earliest_time_s2rta,
                                                         traf.cas[idx]) * 3600 / 1852
                     elif eta_s_preferred > latest_time_s2rta:
-                        time_window_cas_kts = self._rta_cas_wfl(distances, flightlevels, latest_time_s2rta,
+                        time_window_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, latest_time_s2rta,
                                                         traf.cas[idx]) * 3600 / 1852
                     else:
                         time_window_cas_kts = preferred_cas_m_s * 3600 / 1852
-
-                    stack.stack(f'SPD {traf.id[idx]}, {time_window_cas_kts}')
-                    stack.stack(f'VNAV {traf.id[idx]} ON')
+                    if abs(traf.cas[idx] - time_window_cas_kts) > 0.1:
+                        stack.stack(f'SPD {traf.id[idx]}, {time_window_cas_kts}')
+                        stack.stack(f'VNAV {traf.id[idx]} ON')
+                    else:
+                        pass
                 else:
                     return False, 'AFMS mode does not exist' + traf.id[idx]
             else:
@@ -484,8 +506,8 @@ class Afms:
             return tdelta.seconds
 
     def _rta_spd(self, distance_nm, time_s, current_tas_m_s):
-        acceleration_m_s2 = 1.94  # See standard coefficients for Bluesky
-        deceleration_m_s2 = -1.265
+        acceleration_m_s2 = 0.5  # Hard coded based on standard used in BlueSky
+        deceleration_m_s2 = -0.5
         distance_m = distance_nm * 1852
         if time_s > 60:  # TODO From which time before it is not usefull anymore to change the speed?
             if distance_m / time_s > current_tas_m_s:
@@ -509,31 +531,31 @@ class Afms:
 
         return tas2_m_s  # TODO Do I need a speed limiter, or just let Bluesky handle this?
 
-    def _rta_cas_wfl(self, distances, flightlevels, time_s, current_cas_m_s):
+    def _rta_cas_wfl(self, distances_nm, flightlevels_m, time_s, current_cas_m_s):
         """
         Calculate the CAS needed to arrive at the RTA waypoint in the specified time
-        No wind is taken into acocunt.
+        No wind is taken into account.
         :param distances: distances between waypoints
         :param flightlevels: flightlevels for sections
         :param time_s: time in seconds to RTA waypoint
         :param current_cas_m_s: current CAS in m/s
         :return: CAS in m/s
         """
-        acceleration_m_s2 = 1.94/2  # See standard coefficients for Bluesky
-        deceleration_m_s2 = -1.265/2
-        distances_m = distances * 1852
+        acceleration_m_s2 = 0.5/2  # See standard coefficients for Bluesky
+        deceleration_m_s2 = -0.5/2
+        distances_m = distances_nm * 1852
         iterations = 3
         estimated_cas_m_s = current_cas_m_s
-        current_tas_m_s = tools.aero.vcas2tas(current_cas_m_s, flightlevels[0])
+        current_tas_m_s = tools.aero.vcas2tas(current_cas_m_s, flightlevels_m[0])
 
         for it in range(iterations):
-            times_s = np.empty_like(distances)
-            previous_fl_m = flightlevels[0]
+            times_s = np.empty_like(distances_m)
+            previous_fl_m = flightlevels_m[0]
             for i, distance_m in enumerate(distances_m):
-                if flightlevels[i] < 0:
+                if flightlevels_m[i] < 0:
                     next_fl = previous_fl_m
                 else:
-                    next_fl = flightlevels[i]
+                    next_fl = flightlevels_m[i]
                 next_tas_m_s = tools.aero.vcas2tas(estimated_cas_m_s, next_fl)
                 if i == 0:
                     if estimated_cas_m_s > current_cas_m_s + 1.0:
@@ -563,34 +585,35 @@ class Afms:
 
             # Limit cas to stay below Mach 0.95 as it otherwise results in issues with speed limiter
             # Check if the speed limiter has been updated by Joost.
-            if tools.aero.vcas2mach(cas_rta_m_s, flightlevels[0]) > 0.95:
-                print('limited upper', cas_rta_m_s, flightlevels[0])
-                return tools.aero.vmach2cas(0.95, flightlevels[0])
-            elif tools.aero.vcas2mach(cas_rta_m_s, flightlevels[0]) < 0.15:
-                print('limited lower', cas_rta_m_s, flightlevels[0])
-                return tools.aero.vmach2cas(0.15, flightlevels[0])
+            if tools.aero.vcas2mach(cas_rta_m_s, flightlevels_m[0]) > 0.95:
+                print('limited upper', cas_rta_m_s, flightlevels_m[0])
+                return tools.aero.vmach2cas(0.95, flightlevels_m[0])
+            elif tools.aero.vcas2mach(cas_rta_m_s, flightlevels_m[0]) < 0.15:
+                print('limited lower', cas_rta_m_s, flightlevels_m[0])
+                return tools.aero.vmach2cas(0.15, flightlevels_m[0])
             else:
                 return cas_rta_m_s
 
-    def _eta_wfl(self, distances, flightlevels, current_cas_m_s):
+    def _eta_wfl(self, distances_nm, flightlevels_m, current_cas_m_s):
         """
-        Calculate for the current CAS the ETA to the next TW waypoint
+        Estimate for the current CAS the ETA to the next TW waypoint
         No wind is taken into account.
         :param distances: distances between waypoints
         :param flightlevels: flightlevels for sections
         :param current_cas_m_s: current CAS in m/s
         :return: ETA
         """
-        distances_m = distances * 1852
-        times_s = np.empty_like(distances)
-        previous_fl_m = flightlevels[0]
+        distances_m = distances_nm * 1852
+        times_s = np.empty_like(distances_m)
+        previous_fl_m = flightlevels_m[0]
 
         for i, distance_m in enumerate(distances_m):
-            if flightlevels[i] < 0:
-                next_fl = previous_fl_m
+            if flightlevels_m[i] < 0:
+                next_fl_m = previous_fl_m
             else:
-                next_fl = flightlevels[i]
-            next_tas_m_s = tools.aero.vcas2tas(current_cas_m_s, next_fl)
+                next_fl_m = flightlevels_m[i]
+                previous_fl_m = next_fl_m
+            next_tas_m_s = tools.aero.vcas2tas(current_cas_m_s, next_fl_m)
             step_time_s = distance_m / next_tas_m_s
             times_s[i] = step_time_s
 
@@ -598,8 +621,8 @@ class Afms:
         return total_time_s
 
     def _eta_preferred_spd(self, distance_nm, current_tas_m_s, preferred_tas_m_s):
-        acceleration_m_s2 = 1.94  # See standard coefficients for Bluesky
-        deceleration_m_s2 = -1.265
+        acceleration_m_s2 = 0.5  # See standard coefficients for Bluesky
+        deceleration_m_s2 = -0.5
         distance_m = distance_nm * 1852
         if preferred_tas_m_s > current_tas_m_s:
             #Acceleration
