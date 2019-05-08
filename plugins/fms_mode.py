@@ -221,31 +221,29 @@ class Afms:
                         else:
                             pass
                 elif fms_mode == 3:  # AFMS_MODE RTA
-                    #TODO Validation experiment gives strange behaviour
                     rta_init_index, rta_last_index, rta = self._current_rta(idx)
                     time_s2rta = self._time_s2rta(rta)
                     if time_s2rta < self.skip2next_rta_time_s:
                         # Don't give any speed instructions in the last section (Keep stable speed)
-                        rta_init_index, rta_last_index, rta = self._current_rta_plus_one(idx)
-                        time_s2rta = self._time_s2rta(rta)
-                    else:
+                        # rta_init_index, rta_last_index, rta = self._current_rta_plus_one(idx)
+                        # time_s2rta = self._time_s2rta(rta)
                         pass
-
-                    _, dist2nwp = tools.geo.qdrdist(traf.lat[idx], traf.lon[idx],
-                                                    traf.ap.route[idx].wplat[rta_init_index],
-                                                    traf.ap.route[idx].wplon[rta_init_index])
-                    distances_nm = np.concatenate((np.array([dist2nwp]),
-                                                traf.ap.route[idx].wpdistto[rta_init_index + 1:rta_last_index + 1]),
-                                               axis=0)
-                    flightlevels_m = np.concatenate((np.array([traf.alt[idx]]),
-                                                   traf.ap.route[idx].wpalt[rta_init_index + 1:rta_last_index + 1]))
-                    # rta_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, time_s2rta, traf.cas[idx]) * 3600 / 1852
-                    rta_cas_m_s = self._cas2rta(distances_nm, flightlevels_m, time_s2rta, traf.cas[idx])
-                    if abs(traf.cas[idx] - rta_cas_m_s) > 0.5:
-                        stack.stack(f'SPD {traf.id[idx]}, {rta_cas_m_s * 3600 / 1852}')
-                        stack.stack(f'VNAV {traf.id[idx]} ON')
                     else:
-                        pass
+                        _, dist2nwp = tools.geo.qdrdist(traf.lat[idx], traf.lon[idx],
+                                                        traf.ap.route[idx].wplat[rta_init_index],
+                                                        traf.ap.route[idx].wplon[rta_init_index])
+                        distances_nm = np.concatenate((np.array([dist2nwp]),
+                                                    traf.ap.route[idx].wpdistto[rta_init_index + 1:rta_last_index + 1]),
+                                                   axis=0)
+                        flightlevels_m = np.concatenate((np.array([traf.alt[idx]]),
+                                                       traf.ap.route[idx].wpalt[rta_init_index + 1:rta_last_index + 1]))
+                        # rta_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, time_s2rta, traf.cas[idx]) * 3600 / 1852
+                        rta_cas_m_s = self._cas2rta(distances_nm, flightlevels_m, time_s2rta, traf.cas[idx])
+                        if abs(traf.cas[idx] - rta_cas_m_s) > 0.5:
+                            stack.stack(f'SPD {traf.id[idx]}, {rta_cas_m_s * 3600 / 1852}')
+                            stack.stack(f'VNAV {traf.id[idx]} ON')
+                        else:
+                            pass
                 elif fms_mode == 4:  # AFMS_MODE TW
                     rta_init_index, rta_last_index, rta = self._current_rta(idx)
                     tw_init_index, tw_last_index, tw_size = self._current_tw_size(idx)
