@@ -239,9 +239,10 @@ class Afms:
                                                        traf.ap.route[idx].wpalt[rta_init_index + 1:rta_last_index + 1]))
                         # rta_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, time_s2rta, traf.cas[idx]) * 3600 / 1852
                         rta_cas_m_s = self._cas2rta(distances_nm, flightlevels_m, time_s2rta, traf.cas[idx])
-                        if abs(traf.cas[idx] - rta_cas_m_s) > 0.5:
-                            stack.stack(f'SPD {traf.id[idx]}, {rta_cas_m_s * 3600 / 1852}')
-                            stack.stack(f'VNAV {traf.id[idx]} ON')
+                        if abs(traf.cas[idx] - rta_cas_m_s) > 0.5:  # Don't give very small speed changes
+                            if abs(traf.vs[idx]) < 2.5:  # Don't give a speed change when changing altitude
+                                stack.stack(f'SPD {traf.id[idx]}, {rta_cas_m_s * 3600 / 1852}')
+                                stack.stack(f'VNAV {traf.id[idx]} ON')
                         else:
                             pass
                 elif fms_mode == 4:  # AFMS_MODE TW
@@ -607,13 +608,13 @@ class Afms:
         """
         iterations = 4
         estimated_cas_m_s = current_cas_m_s
-        if time2rta_s > 120:
-            for _ in range(iterations):
-                estimated_time2rta_s = self._eta2tw_new_cas_wfl(distances_nm, flightlevels_m, current_cas_m_s,
-                                                                estimated_cas_m_s)
-                estimated_cas_m_s = estimated_cas_m_s * estimated_time2rta_s / time2rta_s
-        else:
-            pass
+        for i in range(iterations):
+            estimated_time2rta_s = self._eta2tw_new_cas_wfl(distances_nm, flightlevels_m, current_cas_m_s,
+                                                            estimated_cas_m_s)
+            previous_estimate_m_s = estimated_cas_m_s
+            estimated_cas_m_s = estimated_cas_m_s * estimated_time2rta_s / time2rta_s
+            if abs(previous_estimate_m_s - estimated_cas_m_s) < 0.1:
+                break
         return estimated_cas_m_s
 
     def _eta2tw_cas_wfl(self, distances_nm, flightlevels_m, cas_m_s):
