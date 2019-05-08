@@ -134,7 +134,7 @@ class Afms:
         super(Afms, self).__init__()
         # Parameters of afms
         self.dt = 60.0  # [s] frequency of afms update (simtime)
-        self.skip2next_rta_time_s = 120.0  # Time when skipping to the RTA beyond the active RTA
+        self.skip2next_rta_time_s = 300.0  # Time when skipping to the RTA beyond the active RTA
         self.rta_standard_window_size = 60.  # [s] standard time window size for rta in seconds
         self._patch_route(self.rta_standard_window_size)
         self._fms_modes = ['OFF', 'CONTINUE', 'OWN', 'RTA', 'TW']
@@ -221,9 +221,11 @@ class Afms:
                         else:
                             pass
                 elif fms_mode == 3:  # AFMS_MODE RTA
+                    #TODO Validation experiment gives strange behaviour
                     rta_init_index, rta_last_index, rta = self._current_rta(idx)
                     time_s2rta = self._time_s2rta(rta)
                     if time_s2rta < self.skip2next_rta_time_s:
+                        # Don't give any speed instructions in the last section (Keep stable speed)
                         rta_init_index, rta_last_index, rta = self._current_rta_plus_one(idx)
                         time_s2rta = self._time_s2rta(rta)
                     else:
@@ -237,9 +239,10 @@ class Afms:
                                                axis=0)
                     flightlevels_m = np.concatenate((np.array([traf.alt[idx]]),
                                                    traf.ap.route[idx].wpalt[rta_init_index + 1:rta_last_index + 1]))
-                    rta_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, time_s2rta, traf.cas[idx]) * 3600 / 1852
-                    if abs(traf.cas[idx] - rta_cas_kts) > 0.1:
-                        stack.stack(f'SPD {traf.id[idx]}, {rta_cas_kts}')
+                    # rta_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, time_s2rta, traf.cas[idx]) * 3600 / 1852
+                    rta_cas_m_s = self._cas2rta(distances_nm, flightlevels_m, time_s2rta, traf.cas[idx])
+                    if abs(traf.cas[idx] - rta_cas_m_s) > 0.5:
+                        stack.stack(f'SPD {traf.id[idx]}, {rta_cas_m_s * 3600 / 1852}')
                         stack.stack(f'VNAV {traf.id[idx]} ON')
                     else:
                         pass
@@ -271,7 +274,7 @@ class Afms:
                         # CAS specified
                         preferred_cas_m_s = own_spd
 
-                    eta_s_preferred = self._eta_wfl(distances_nm, flightlevels_m, preferred_cas_m_s)
+                    eta_s_preferred = self._eta2tw_cas_wfl(distances_nm, flightlevels_m, preferred_cas_m_s)
 
                     time_s2rta = self._time_s2rta(rta)
 
@@ -290,7 +293,7 @@ class Afms:
                         flightlevels_m = np.concatenate((np.array([traf.alt[idx]]),
                                                        traf.ap.route[idx].wpalt[rta_init_index + 1:rta_last_index + 1]))
 
-                        eta_s_preferred = self._eta_wfl(distances_nm, flightlevels_m, preferred_cas_m_s)
+                        eta_s_preferred = self._eta2tw_cas_wfl(distances_nm, flightlevels_m, preferred_cas_m_s)
                     else:
                         pass
 
@@ -584,7 +587,7 @@ class Afms:
             estimated_cas_m_s = cas_rta_m_s * total_time_s / time_s
 
             # Limit cas to stay below Mach 0.95 as it otherwise results in issues with speed limiter
-            # Check if the speed limiter has been updated by Joost.
+            # TODO Check if the speed limiter has been updated by Joost.
             if tools.aero.vcas2mach(cas_rta_m_s, flightlevels_m[0]) > 0.95:
                 print('limited upper', cas_rta_m_s, flightlevels_m[0])
                 return tools.aero.vmach2cas(0.95, flightlevels_m[0])
@@ -594,44 +597,96 @@ class Afms:
             else:
                 return cas_rta_m_s
 
-    def _eta_wfl(self, distances_nm, flightlevels_m, current_cas_m_s):
+    def _cas2rta(self, distances_nm, flightlevels_m, time2rta_s, current_cas_m_s):
         """
-        Estimate for the current CAS the ETA to the next TW waypoint
+        Calculate the CAS needed to arrive at the RTA waypoint in the specified time
         No wind is taken into account.
         :param distances: distances between waypoints
         :param flightlevels: flightlevels for sections
+        :param time2rta_s: time in seconds to RTA waypoint
         :param current_cas_m_s: current CAS in m/s
-        :return: ETA
+        :return: CAS in m/s
+        """
+        iterations = 4
+        estimated_cas_m_s = current_cas_m_s
+        if time2rta_s > 120:
+            for _ in range(iterations):
+                estimated_time2rta_s = self._eta2tw_new_cas_wfl(distances_nm, flightlevels_m, current_cas_m_s,
+                                                                estimated_cas_m_s)
+                estimated_cas_m_s = estimated_cas_m_s * estimated_time2rta_s / time2rta_s
+        else:
+            pass
+        return estimated_cas_m_s
+
+    def _eta2tw_cas_wfl(self, distances_nm, flightlevels_m, cas_m_s):
+        """
+        Estimate for the given CAS the ETA to the next TW waypoint
+        No wind is taken into account.
+        :param distances: distances between waypoints
+        :param flightlevels: flightlevels for sections
+        :param cas_m_s: CAS in m/s
+        :return: ETA in seconds
         """
         distances_m = distances_nm * 1852
         times_s = np.empty_like(distances_m)
         previous_fl_m = flightlevels_m[0]
 
+        # Assumption is instantanuous climb to next flight level, and instantanuous speed change at new flight level
         for i, distance_m in enumerate(distances_m):
             if flightlevels_m[i] < 0:
                 next_fl_m = previous_fl_m
             else:
                 next_fl_m = flightlevels_m[i]
                 previous_fl_m = next_fl_m
-            next_tas_m_s = tools.aero.vcas2tas(current_cas_m_s, next_fl_m)
+            next_tas_m_s = tools.aero.vcas2tas(cas_m_s, next_fl_m)
             step_time_s = distance_m / next_tas_m_s
             times_s[i] = step_time_s
 
         total_time_s = np.sum(times_s)
         return total_time_s
 
-    def _eta_preferred_spd(self, distance_nm, current_tas_m_s, preferred_tas_m_s):
-        acceleration_m_s2 = 0.5  # See standard coefficients for Bluesky
+    def _dtime2new_cas(self, flightlevel_m, current_cas_m_s, new_cas_m_s):
+        """
+        Estimated delta time between flying at current CAS, and
+        changing speed to the new CAS
+        :param flightlevel_m: Flightlevel in m
+        :param current_cas_m_s: current CAS in m/s
+        :param new_cas_m_s: new CAS in m/s
+        :return: delta time in seconds
+        """
+        acceleration_m_s2 = 0.5
         deceleration_m_s2 = -0.5
-        distance_m = distance_nm * 1852
-        if preferred_tas_m_s > current_tas_m_s:
+
+        current_tas_m_s = tools.aero.vcas2tas(current_cas_m_s, flightlevel_m)
+        new_tas_m_s = tools.aero.vcas2tas(new_cas_m_s, flightlevel_m)
+
+        if new_tas_m_s > current_tas_m_s:
             #Acceleration
             a = acceleration_m_s2
         else:
             #Deceleration
             a = deceleration_m_s2
-        t2_s = (distance_m - 1 / (2 * a) * (preferred_tas_m_s ** 2 - current_tas_m_s ** 2)) / preferred_tas_m_s
-        if t2_s < 0:
+        # t2_s = (distance_m - 1 / (2 * a) * (preferred_tas_m_s ** 2 - current_tas_m_s ** 2)) / preferred_tas_m_s
+        # TODO speed is zero?
+        return 0.5 * (new_tas_m_s - current_tas_m_s) ** 2 / a / current_tas_m_s
+        # if t2_s < 0:
+        #     return 0.0
+        # else:
+        #     return t2_s
+
+    def _eta2tw_new_cas_wfl(self, distances_nm, flightlevels_m, current_cas_m_s, new_cas_m_s):
+        """
+        Estimate for the current CAS and new CAS the ETA to the next TW waypoint
+        No wind is taken into account.
+        :param distances: distances between waypoints
+        :param flightlevels: flightlevels for sections
+        :param current_cas_m_s: current CAS in m/s
+        :param new_cas_m_s: new CAS in m/s
+        :return: ETA in seconds
+        """
+        total_time_s = self._eta2tw_cas_wfl(distances_nm, flightlevels_m, new_cas_m_s) - \
+                       self._dtime2new_cas(flightlevels_m[0], current_cas_m_s, new_cas_m_s)
+        if total_time_s < 0:
             return 0.0
         else:
-            return t2_s
+            return total_time_s
