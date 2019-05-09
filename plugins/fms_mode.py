@@ -201,7 +201,12 @@ class Afms:
         for idx, _ in enumerate(traf.id):
             fms_mode = self._current_fms_mode(idx)
             if int(traf.perf.phase[idx]) == PHASE['CR']:
-                if fms_mode == 0:  # AFMS_MODE OFF
+                # if traf.ap.route[idx].iactwp < 0:
+                #     pass
+                if traf.actwp.next_qdr[idx] < -361 :
+                    pass
+                elif fms_mode == 0:  # AFMS_MODE OFF
+                    # stack.stack("HOLD")
                     pass
                 elif fms_mode == 1:  # AFMS_MODE CONTINUE
                     pass
@@ -297,17 +302,21 @@ class Afms:
                     else:
                         pass
 
-                    earliest_time_s2rta = time_s2rta - tw_size/2
-                    latest_time_s2rta = time_s2rta + tw_size/2
+                    earliest_time_s2rta = max(time_s2rta - tw_size/2, 0)
+                    latest_time_s2rta = max(time_s2rta + tw_size/2, 0)
 
                     if eta_s_preferred < earliest_time_s2rta:  # Prefer earlier then TW
                         time_window_cas_m_s = self._cas2rta(distances_nm, flightlevels_m, earliest_time_s2rta,
                                                             traf.cas[idx])
+                        # if time_window_cas_m_s < 1.0:
+                        #     print(time_window_cas_m_s, idx, "Earliest")
                         # time_window_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, earliest_time_s2rta,
                         #                                 traf.cas[idx]) * 3600 / 1852
                     elif eta_s_preferred > latest_time_s2rta:  # Prefer later then TW
                         time_window_cas_m_s = self._cas2rta(distances_nm, flightlevels_m, latest_time_s2rta,
                                                             traf.cas[idx])
+                        if time_window_cas_m_s < 1.0:
+                            print(time_window_cas_m_s, idx, latest_time_s2rta, eta_s_preferred, "Latest")
                         # time_window_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, latest_time_s2rta,
                         #                                 traf.cas[idx]) * 3600 / 1852
                     else:
@@ -315,6 +324,8 @@ class Afms:
 
                     if abs(traf.cas[idx] - time_window_cas_m_s) > 0.5:  # Don't give very small speed changes
                         if abs(traf.vs[idx]) < 2.5:  # Don't give a speed change when changing altitude
+                            # if time_window_cas_m_s < 1.0:
+                            #     print(time_window_cas_m_s, idx)
                             if tools.aero.vcas2mach(time_window_cas_m_s, flightlevels_m[0]) > 0.95:
                                 stack.stack(f'SPD {traf.id[idx]}, {0.95}')
                             elif flightlevels_m[0] > 7620:
@@ -359,6 +370,7 @@ class Afms:
             # print(f'current rta {traf.ap.route[idx].iactwp} {rta_index} {rta}')
             return traf.ap.route[idx].iactwp, traf.ap.route[idx].iactwp + rta_index, rta
         else:
+            # print(rta_index, rta, idx, "_current_rta")
             return -1, -1, rta
 
     def _current_rta_plus_one(self, idx):
@@ -375,6 +387,7 @@ class Afms:
             # print(f'new beyond {init_index_rta} {last_index_active_rta} {beyond_rta_index} {active_rta} {beyond_rta}')
             return init_index_rta, last_index_active_rta + 1 + beyond_rta_index, beyond_rta
         else:
+            # print(beyond_rta_index, beyond_rta, init_index_rta, last_index_active_rta, active_rta, idx, "_current_rta_plus_one")
             return init_index_rta, last_index_active_rta, active_rta
 
 
