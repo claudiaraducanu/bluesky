@@ -245,6 +245,8 @@ class Afms:
                             if abs(traf.vs[idx]) < 2.5:  # Don't give a speed change when changing altitude
                                 if tools.aero.vcas2mach(rta_cas_m_s, flightlevels_m[0]) > 0.95:
                                     stack.stack(f'SPD {traf.id[idx]}, {0.95}')
+                                elif flightlevels_m[0] > 7620:
+                                    stack.stack(f'SPD {traf.id[idx]}, {tools.aero.vcas2mach(rta_cas_m_s, flightlevels_m[0])}')
                                 else:
                                     stack.stack(f'SPD {traf.id[idx]}, {rta_cas_m_s * 3600 / 1852}')
                                 stack.stack(f'VNAV {traf.id[idx]} ON')
@@ -315,6 +317,8 @@ class Afms:
                         if abs(traf.vs[idx]) < 2.5:  # Don't give a speed change when changing altitude
                             if tools.aero.vcas2mach(time_window_cas_m_s, flightlevels_m[0]) > 0.95:
                                 stack.stack(f'SPD {traf.id[idx]}, {0.95}')
+                            elif flightlevels_m[0] > 7620:
+                                stack.stack(f'SPD {traf.id[idx]}, {tools.aero.vcas2mach(time_window_cas_m_s, flightlevels_m[0])}')
                             else:
                                 stack.stack(f'SPD {traf.id[idx]}, {time_window_cas_m_s * 3600 / 1852}')
                             stack.stack(f'VNAV {traf.id[idx]} ON')
