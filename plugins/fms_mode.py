@@ -94,10 +94,10 @@ def init_plugin():
             'specified waypoint. The time constraint is only used if the AFMS mode is set accordingly to TW'],
         'RTWA_AT': [
             # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
-            'acid RTA_AT wpname HH:MM:SS [time_window_size]',
+            'acid RTWA_AT wpname time_window_size HH:MM:SS ',
 
             # A list of the argument types your function accepts. For a description of this, see ...
-            'acid, wpinroute, txt, [int]',
+            'acid, wpinroute, int, txt',
 
             # The name of your function in this plugin
             afms.rtwa_at,
@@ -248,10 +248,11 @@ class Afms:
                 elif fms_mode == 4:  # AFMS_MODE TW
                     rta_init_index, rta_last_index, rta = self._current_rta(idx)
                     tw_init_index, tw_last_index, tw_size = self._current_tw_size(idx)
+                    time_s2rta = self._time_s2rta(rta)
+
                     _, dist2nwp = tools.geo.qdrdist(traf.lat[idx], traf.lon[idx],
                                                     traf.ap.route[idx].wplat[rta_init_index],
                                                     traf.ap.route[idx].wplon[rta_init_index])
-
                     distances_nm = np.concatenate((np.array([dist2nwp]),
                                                 traf.ap.route[idx].wpdistto[rta_init_index + 1:rta_last_index + 1]),
                                                axis=0)
@@ -261,31 +262,24 @@ class Afms:
                     # Calculate Preferred Speed and Preferred Time of Arrival
                     own_spd = self._current_own_spd(idx)
                     if own_spd < 0:
-                        # No speed specified. Use current speed
-                        if traf.selspd[idx] > 0:
-                            _, preferred_cas_m_s, _ = tools.aero.vcasormach(traf.selspd[idx])
-                        else:
+                        # No speed specified.
+                        if traf.selspd[idx] > 0:  # Use selected speed
+                            _, preferred_cas_m_s, _ = tools.aero.vcasormach(traf.selspd[idx], traf.alt[idx])
+                        else:  # Use current speed
                             preferred_cas_m_s = traf.cas[idx]
-                    elif own_spd < 1:
-                        # Mach speed specified
-                        preferred_cas_m_s = tools.aero.vmach2cas(own_spd, traf.alt[idx])
                     else:
-                        # CAS specified
-                        preferred_cas_m_s = own_spd
+                        _, preferred_cas_m_s, _ = tools.aero.vcasormach(own_spd, traf.alt[idx])
 
                     eta_s_preferred = self._eta2tw_cas_wfl(distances_nm, flightlevels_m, preferred_cas_m_s)
 
-                    time_s2rta = self._time_s2rta(rta)
-
                     # Jump to next +1 waypoint when close to next waypoint
                     if eta_s_preferred < self.skip2next_rta_time_s:
-                        #TODO What if there is no next RTA waypoint?
                         rta_init_index, rta_last_index, rta = self._current_rta_plus_one(idx)
+                        #Don't change the time window size yet. Keep the current window size
                         time_s2rta = self._time_s2rta(rta)
                         _, dist2nwp = tools.geo.qdrdist(traf.lat[idx], traf.lon[idx],
                                                         traf.ap.route[idx].wplat[rta_init_index],
                                                         traf.ap.route[idx].wplon[rta_init_index])
-
                         distances_nm = np.concatenate((np.array([dist2nwp]),
                                                     traf.ap.route[idx].wpdistto[rta_init_index + 1:rta_last_index + 1]),
                                                    axis=0)
@@ -299,17 +293,23 @@ class Afms:
                     earliest_time_s2rta = time_s2rta - tw_size/2
                     latest_time_s2rta = time_s2rta + tw_size/2
 
-                    if eta_s_preferred < earliest_time_s2rta:
-                        time_window_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, earliest_time_s2rta,
-                                                        traf.cas[idx]) * 3600 / 1852
-                    elif eta_s_preferred > latest_time_s2rta:
-                        time_window_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, latest_time_s2rta,
-                                                        traf.cas[idx]) * 3600 / 1852
+                    if eta_s_preferred < earliest_time_s2rta:  # Prefer earlier then TW
+                        time_window_cas_m_s = self._cas2rta(distances_nm, flightlevels_m, earliest_time_s2rta,
+                                                            traf.cas[idx])
+                        # time_window_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, earliest_time_s2rta,
+                        #                                 traf.cas[idx]) * 3600 / 1852
+                    elif eta_s_preferred > latest_time_s2rta:  # Prefer later then TW
+                        time_window_cas_m_s = self._cas2rta(distances_nm, flightlevels_m, latest_time_s2rta,
+                                                            traf.cas[idx])
+                        # time_window_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, latest_time_s2rta,
+                        #                                 traf.cas[idx]) * 3600 / 1852
                     else:
-                        time_window_cas_kts = preferred_cas_m_s * 3600 / 1852
-                    if abs(traf.cas[idx] - time_window_cas_kts) > 0.1:
-                        stack.stack(f'SPD {traf.id[idx]}, {time_window_cas_kts}')
-                        stack.stack(f'VNAV {traf.id[idx]} ON')
+                        time_window_cas_m_s = preferred_cas_m_s
+
+                    if abs(traf.cas[idx] - time_window_cas_m_s) > 0.5:  # Don't give very small speed changes
+                        if abs(traf.vs[idx]) < 2.5:  # Don't give a speed change when changing altitude
+                            stack.stack(f'SPD {traf.id[idx]}, {time_window_cas_m_s * 3600 / 1852}')
+                            stack.stack(f'VNAV {traf.id[idx]} ON')
                     else:
                         pass
                 else:
@@ -443,14 +443,12 @@ class Afms:
                 return False, name + 'not found in route' + traf.id[idx]
 
     def rtwa_at(self, idx, *args):
-        if len(args) < 2 or len(args) > 3:
-            return False, 'RTA_AT needs 3 or 4 arguments'
-        elif len(args) == 2:
-            return self.rta_at(idx, *args)
+        if len(args) != 3:
+            return False, 'RTWA_AT needs 4 arguments'
         else:
             name = args[0]
-            rta_time = args[1]
-            tw_size = args[2]
+            tw_size = args[1]
+            rta_time = args[2]
             if name in traf.ap.route[idx].wpname:
                 wpidx = traf.ap.route[idx].wpname.index(name)
                 traf.ap.route[idx].wprta[wpidx] = datetime.strptime(rta_time, '%H:%M:%S').time()
