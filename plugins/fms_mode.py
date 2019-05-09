@@ -315,8 +315,8 @@ class Afms:
                     elif eta_s_preferred > latest_time_s2rta:  # Prefer later then TW
                         time_window_cas_m_s = self._cas2rta(distances_nm, flightlevels_m, latest_time_s2rta,
                                                             traf.cas[idx])
-                        if time_window_cas_m_s < 1.0:
-                            print(time_window_cas_m_s, idx, latest_time_s2rta, eta_s_preferred, "Latest")
+                        # if time_window_cas_m_s < 1.0:
+                        #     print(time_window_cas_m_s, idx, latest_time_s2rta, eta_s_preferred, "Latest")
                         # time_window_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, latest_time_s2rta,
                         #                                 traf.cas[idx]) * 3600 / 1852
                     else:
