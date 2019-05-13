@@ -39,7 +39,9 @@ if __name__ == "__main__":
         with open(os.path.join(scn_trajectory_path, key + '_' + log_type + '_' +
                                                     str(datetime.datetime.now()) + '.scn'),
                   'w') as scenario: # open the file
+
             scenario.write('0:00:00.00>HOLD\n')
+            scenario.write('0:00:00.00>DATE \n')
             scenario.write(trajectories.scn[key]['cre_function'])
             scenario.write(trajectories.scn[key]['orig_function'])
             scenario.write(trajectories.scn[key]['dest_function'])

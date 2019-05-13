@@ -5,4 +5,7 @@
 00:00:00.00>KL204 addwpt NIK
 00:00:00.00>KL204 addwpt SPY
 00:00:00.00>wind 52,4,,300,100
-00:00:00.00>FF
+0:00:00.00>CRELOG STANDARD 0.1
+0:00:00.00>STANDARD ADD id,lat,lon,alt,traf.perf.mass,traf.wind
+0:00:00.00>STANDARD ON
+0:00:00.00>OP

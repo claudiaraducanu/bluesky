@@ -4,7 +4,7 @@ from datetime import date, datetime, time, timedelta
 from math import sqrt
 import numpy as np
 
-from bluesky import sim, stack, traf, tools  #, settings, navdb, sim, scr, tools
+from bluesky import sim, stack, traf, tools  #, settings, navdb, sim, scr, windtools
 from bluesky.traffic.route import Route
 from bluesky.traffic.performance.legacy.performance import PHASE
 # import inspect  # TODO Remove after test

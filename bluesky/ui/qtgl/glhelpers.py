@@ -1,5 +1,5 @@
 """
-BlueSky-QtGL tools       : Tools and objects that are used in the BlueSky-QtGL implementation
+BlueSky-QtGL windtools       : Tools and objects that are used in the BlueSky-QtGL implementation
 
 Methods:
     load_texture(fname)  : GL-texture load function. Returns id of new texture

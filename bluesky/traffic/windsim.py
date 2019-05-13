@@ -5,6 +5,7 @@ import bluesky as bs
 
 
 class WindSim(Windfield):
+
     def add(self, *arg):
 
         lat = arg[0]

@@ -1,0 +1,16 @@
+
+In order to download weather data from the ECMWF, the MARS interface is used. A
+complete description of the MARS interface can be found here 
+[https://confluence.ecmwf.int/display/WEBAPI/Access+MARS]. Alternatively the web
+interface (although limited) can be used 
+[https://apps.ecmwf.int/datasets/data/tigge/levtype=sfc/type=cf/]. Alternativly,
+the web interface can be used to generate the MARS request.
+
+An example that uses the MARS interface to access the data can be found in the 
+'mars.py' file. As a prerequisite it requires the ECMWF API client library and 
+a user account on the ECMWF website (a free account can be created). 
+
+After setup, simply run the python script to start the download. Note, the 
+request will be put in a queue and might take a while to start. The MARS 
+progress can also be tracked using their web-api after loggin in
+[http://apps.ecmwf.int/mars-activity/].

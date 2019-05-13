@@ -93,6 +93,8 @@ class trajectories():
 
         return spd,hdg
 
+
+
     def cre_command(self):
 
         for key in self.data:

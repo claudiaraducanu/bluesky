@@ -1,5 +1,5 @@
 """
-Aircraft Performance Modeling tools
+Aircraft Performance Modeling windtools
 
 Modules:
      esf (performance parameters): Energy Share Factor for climb/descent performance

@@ -1,6 +1,6 @@
 """ External control plugin for Machine Learning applications. """
 # Import the global bluesky objects. Uncomment the ones you need
-from bluesky import stack, sim, traf  #, settings, navdb, traf, sim, scr, tools
+from bluesky import stack, sim, traf  #, settings, navdb, traf, sim, scr, windtools
 
 
 myclientrte = None

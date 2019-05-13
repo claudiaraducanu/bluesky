@@ -2,7 +2,7 @@ import numpy as np
 import collections
 import textwrap
 from datetime import datetime
-# from bluesky.tools.aero import qdrdist, ft, tas2cas
+# from bluesky.windtools.aero import qdrdist, ft, tas2cas
 
 class readFile:
 

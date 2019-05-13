@@ -11,7 +11,7 @@ Geovector is defined as:
  """
 
 
-from bluesky import stack,traf,sim,tools  #, settings, navdb, traf, sim, scr, tools
+from bluesky import stack,traf,sim,tools  #, settings, navdb, traf, sim, scr, windtools
 from bluesky.tools import areafilter
 from bluesky.tools.aero import vtas2cas,ft
 from bluesky.tools.misc import degto180

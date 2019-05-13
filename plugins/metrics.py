@@ -5,7 +5,7 @@ try:
 except ImportError:
     # In python <3.3 collections.abc doesn't exist
     from collections import Collection
-from bluesky import stack, traf, sim  #, settings, navdb, traf, sim, scr, tools
+from bluesky import stack, traf, sim  #, settings, navdb, traf, sim, scr, windtools
 from bluesky.tools import areafilter, datalog, plotter, geo, TrafficArrays
 from bluesky.tools.aero import nm, ft
 

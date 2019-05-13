@@ -4,14 +4,14 @@
     in a pickle file.
     This is a condition based logger unlike the standard BlueSky logging tool which is periodic.
 """# Import the global bluesky objects. Uncomment the ones you need
-from bluesky import stack  #, settings, navdb, traf, sim, scr, tools
+from bluesky import stack  #, settings, navdb, traf, sim, scr, windtools
 import numpy as np
 import pickle
 import os
 import pandas as pd
 from datetime import datetime
 # Import the global bluesky objects. Uncomment the ones you need
-from bluesky import traf, sim, stack #, settings, navdb, traf, sim, scr, tools
+from bluesky import traf, sim, stack #, settings, navdb, traf, sim, scr, windtools
 from bluesky.tools import datalog, areafilter, \
     TrafficArrays, RegisterElementParameters
 from bluesky import settings

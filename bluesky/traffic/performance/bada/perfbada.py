@@ -589,8 +589,8 @@ class PerfBADA(TrafficArrays):
         # if hmax in OPF File ==0: hmaxact = hmo, else minimum(hmo, hmact)
         self.hmaxact = (self.hmax==0)*self.hmo +(self.hmax !=0)*np.minimum(self.hmo, self.hact)
 
-        # forwarding to tools
-        # forwarding to tools
+        # forwarding to windtools
+        # forwarding to windtools
         bs.traf.limspd,          \
         bs.traf.limspd_flag,     \
         bs.traf.limalt,          \

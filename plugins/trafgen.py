@@ -8,13 +8,13 @@ Make sure scenario can be saved
 """
 
 
-from bluesky import stack,traf,sim,tools,navdb  #, settings, navdb, traf, sim, scr, tools
+from bluesky import stack,traf,sim,tools,navdb  #, settings, navdb, traf, sim, scr, windtools
 from trafgenclasses import Source, Drain, setcircle
 from bluesky.tools.position import txt2pos
 from bluesky.tools.geo import kwikpos
-#from bluesky.tools import areafilter
-#from bluesky.tools.aero import vtas2cas,ft
-#from bluesky.tools.misc import degto180
+#from bluesky.windtools import areafilter
+#from bluesky.windtools.aero import vtas2cas,ft
+#from bluesky.windtools.misc import degto180
 
 
 import numpy as np

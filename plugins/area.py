@@ -3,7 +3,7 @@
     logged with the FLSTLOG logger. """
 import numpy as np
 # Import the global bluesky objects. Uncomment the ones you need
-from bluesky import traf, sim  #, settings, navdb, traf, sim, scr, tools
+from bluesky import traf, sim  #, settings, navdb, traf, sim, scr, windtools
 from bluesky.tools import datalog, areafilter, \
     TrafficArrays, RegisterElementParameters
 from bluesky.tools.aero import ft

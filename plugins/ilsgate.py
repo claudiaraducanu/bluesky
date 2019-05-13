@@ -2,7 +2,7 @@
     in BlueSky as the description of your plugin. """
 import numpy as np
 # Import the global bluesky objects. Uncomment the ones you need
-from bluesky import stack  #, settings, navdb, traf, sim, scr, tools
+from bluesky import stack  #, settings, navdb, traf, sim, scr, windtools
 from bluesky import navdb
 from bluesky.tools.aero import ft
 from bluesky.tools import geo, areafilter

@@ -348,7 +348,7 @@ class PerfBS(TrafficArrays):
                             (self.phase==5)*vtas2cas(self.vmld, bs.traf.alt) + (self.phase==6)*-10.0
 
 
-        # forwarding to tools
+        # forwarding to windtools
         bs.traf.limspd,          \
         bs.traf.limspd_flag,     \
         bs.traf.limalt,          \

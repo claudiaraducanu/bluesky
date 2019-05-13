@@ -5,7 +5,7 @@
 # Developed by Julia and Jerom, superteam!
 
 # Import the global bluesky objects. Uncomment the ones you need
-from bluesky import stack, traf, sim  #, settings, navdb, traf, sim, scr, tools
+from bluesky import stack, traf, sim  #, settings, navdb, traf, sim, scr, windtools
 from bluesky.tools.aero import kts, ft, fpm, vcas2tas
 from bluesky.tools import geo
 import numpy as np

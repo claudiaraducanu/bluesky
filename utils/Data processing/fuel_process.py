@@ -33,10 +33,8 @@ if __name__ == "__main__":
             else:
                 print("No data loaded.")
                 # pass
-
         # process name
         split_name = name.split('_')
-
         name_components = {'log_name':split_name[0],
                            'flight_id':split_name[1],
                            'ac_type':split_name[2],
@@ -48,6 +46,8 @@ if __name__ == "__main__":
 
 
         # Plotting
+        data = pd.DataFrame(data,columns=['Simulation time [s] ', 'Altitude [m] '])
+        print(data)
 
         fig, ax = plt.subplots(2, 2) # create full grid of subplots in a single line
 

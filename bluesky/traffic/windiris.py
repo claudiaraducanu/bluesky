@@ -4,7 +4,6 @@ Author: Remon van den Brandt
 Date: 11-12-2018
 """
 
-
 from netCDF4 import date2num, num2date
 from scipy import ndimage, interpolate
 import numpy as np
