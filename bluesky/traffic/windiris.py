@@ -1,8 +1,15 @@
 """
 Implementation of the weather module in BlueSky with support for netCDF files.
+The module assumes only the difference of the wind in comparison to the
+average wind of the complete ensemble set.
 
-Author: Remon van den Brandt
-Date: 11-12-2018
+NOTE:
+This WindIris module will only work correctly if the DATE is set before loading
+the wind data.
+
+Original Author: Remon van den Brandt
+Update Author: René Verbeek
+Date: 17-5-2019
 """
 
 
@@ -45,8 +52,10 @@ class WindIris:
         self.lon_stepsize = None
         self.lat_first = None
         self.lon_first = None
-        self.time1 = None
-        self.time0 = None
+        self.time1_num = None
+        self.time0_num = None
+        self.time0_utc_num = None
+        self.time0_sim = None
         self.north_mean = []
         self.east_mean = []
         self.ens = []
@@ -55,10 +64,6 @@ class WindIris:
         self.__ens = []
 
         self.__loaded = False
-
-    # def _get_mean(self, lat, lon, pressure, time):
-    #     time = date2num(time, units='hours since 1900-01-01 00:00:0.0', calendar='gregorian')
-    #     return self.__interpolate(self.north_mean, self.east_mean, lat, lon, pressure, time)
 
     def _get_wind(self, lat, lon, pressure, time, ens=None):
         """
@@ -86,9 +91,6 @@ class WindIris:
         """
 
         if self.__loaded:
-            # TODO: find a faster alternative to date2num
-            time = date2num(time, units='hours since 1900-01-01 00:00:0.0', calendar='gregorian')
-
             if ens:
                 self.__load_ensemble(ens)
             return self.__interpolate(self.north, self. east, lat, lon, pressure, time)
@@ -120,8 +122,10 @@ class WindIris:
 
         self.pressure = self.cubes[0].coord('pressure_level').points
         self.t = self.cubes[0].coord('time').points
-        self.time1 = self.cubes[0].coord('time').points[1]
-        self.time0 = self.cubes[0].coord('time').points[0]
+        self.time0_utc_num = date2num(bs.sim.utc, units='hours since 1900-01-01 00:00:0.0', calendar='gregorian') * 3600
+        self.time0_sim = bs.sim.simt
+        self.time1_num = self.cubes[0].coord('time').points[1] * 3600.
+        self.time0_num = self.cubes[0].coord('time').points[0] * 3600.
 
         if self.cubes[0].coords('ensemble_member'):
             self.ens = self.cubes[0].coord('ensemble_member').points
@@ -169,7 +173,7 @@ class WindIris:
             East component of the wind.
          """
         p = vatmos(useralt)[0]
-        time = bs.sim.utc
+        time = bs.sim.simt
 
         return self._get_wind(userlat, userlon, p, time)
 
@@ -223,7 +227,7 @@ class WindIris:
         f = interpolate.interp1d(self.pressure, range(len(self.pressure)), bounds_error=True, assume_sorted=True)
         pres_i = f(pressure)
 
-        time_i = (time - self.time0) / (self.time1 - self.time0)
+        time_i = (time - self.time0_sim) / (self.time1_num - self.time0_num)
 
         # TODO check for out of bounds
         coord = np.vstack(np.broadcast_arrays(time_i, pres_i, lat_i, lon_i))
