@@ -226,7 +226,7 @@ class WindIris:
         time_i = (time - self.time0) / (self.time1 - self.time0)
 
         # TODO check for out of bounds
-        coord = np.vstack((time_i, pres_i, lat_i, lon_i))
+        coord = np.vstack(np.broadcast_arrays(time_i, pres_i, lat_i, lon_i))
 
         # TODO The wrap around also wraps around the time, which does not give the correct behaviour.
         north = ndimage.map_coordinates(cube_n, coord, order=1, mode='wrap')

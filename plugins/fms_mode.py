@@ -12,6 +12,8 @@ from bluesky.traffic.performance.legacy.performance import PHASE
 # Global data
 afms = None
 
+#TODO Implement idea from Johannes to have updates at the waypoints, on an interval, reseting interal at waypoint
+
 def init_plugin():
 
     # Additional initilisation code
