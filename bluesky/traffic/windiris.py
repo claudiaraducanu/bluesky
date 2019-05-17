@@ -47,8 +47,8 @@ class WindIris:
         self.lon_first = None
         self.time1 = None
         self.time0 = None
-        # self.north_mean = []
-        # self.east_mean = []
+        self.north_mean = []
+        self.east_mean = []
         self.ens = []
         self.north = []
         self.east = []
@@ -125,8 +125,8 @@ class WindIris:
 
         if self.cubes[0].coords('ensemble_member'):
             self.ens = self.cubes[0].coord('ensemble_member').points
-            # self.north_mean = self.cubes[0].collapsed('ensemble_member', iris.analysis.MEAN).data
-            # self.east_mean = self.cubes[1].collapsed('ensemble_member', iris.analysis.MEAN).data
+            self.north_mean = self.cubes[0].collapsed('ensemble_member', iris.analysis.MEAN).data
+            self.east_mean = self.cubes[1].collapsed('ensemble_member', iris.analysis.MEAN).data
         else:
             self.ens = []
             self.north = self.cubes[0].data
@@ -207,8 +207,8 @@ class WindIris:
         if list(self.ens):
             # if ens member is different from the one currently loaded
             if self.__ens is not ens:
-                self.north = self.cubes[0].extract(iris.Constraint(ensemble_member=ens)).data  # - self.north_mean
-                self.east = self.cubes[1].extract(iris.Constraint(ensemble_member=ens)).data  # - self.east_mean
+                self.north = self.cubes[0].extract(iris.Constraint(ensemble_member=ens)).data - self.north_mean
+                self.east = self.cubes[1].extract(iris.Constraint(ensemble_member=ens)).data - self.east_mean
             self.__ens = ens
 
     def __interpolate(self, cube_n, cube_e, lat, lon, pressure, time):
