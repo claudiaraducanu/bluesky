@@ -41,6 +41,12 @@ class WindIris:
         self.lon = []
         self.pressure = []
         self.t = []
+        self.lat_stepsize = None
+        self.lon_stepsize = None
+        self.lat_first = None
+        self.lon_first = None
+        self.time1 = None
+        self.time0 = None
         # self.north_mean = []
         # self.east_mean = []
         self.ens = []
@@ -106,8 +112,17 @@ class WindIris:
 
         self.lat = self.cubes[0].coord('latitude').points
         self.lon = self.cubes[0].coord('longitude').points
+
+        self.lat_stepsize =self.cubes[0].coord('latitude').points[1] - self.cubes[0].coord('latitude').points[0]
+        self.lon_stepsize = self.cubes[0].coord('longitude').points[1] - self.cubes[0].coord('longitude').points[0]
+        self.lat_first = self.cubes[0].coord('latitude').points[0]
+        self.lon_first = self.cubes[0].coord('longitude').points[0]
+
         self.pressure = self.cubes[0].coord('pressure_level').points
         self.t = self.cubes[0].coord('time').points
+        self.time1 = self.cubes[0].coord('time').points[1]
+        self.time0 = self.cubes[0].coord('time').points[0]
+
         if self.cubes[0].coords('ensemble_member'):
             self.ens = self.cubes[0].coord('ensemble_member').points
             # self.north_mean = self.cubes[0].collapsed('ensemble_member', iris.analysis.MEAN).data
@@ -197,26 +212,23 @@ class WindIris:
             self.__ens = ens
 
     def __interpolate(self, cube_n, cube_e, lat, lon, pressure, time):
-        # wrap longitude around for periodic boundary
         lon = (lon + 360) % 360
+
+        # find coordinates, assumes grid starting at lon 0.0 and lat 90.0
+        lon_i = lon / self.lon_stepsize
+        lat_i = (lat - 90) / self.lat_stepsize
 
         # saturate pressure altitude
         pressure = np.clip(pressure, self.pressure[0], self.pressure[-1])
-
-        # find coordinates, assumes 720/360 grid size TODO change to be more flexible
-        lon_i = lon * (720 / 360)
-        lat_i = (lat - 90) * (360 / -180)
-
         f = interpolate.interp1d(self.pressure, range(len(self.pressure)), bounds_error=True, assume_sorted=True)
         pres_i = f(pressure)
-        # TODO Speed up calculating time, remember time points
 
-        time_i = (time - self.cubes[0].coord('time').points[0]) /\
-                 (self.cubes[0].coord('time').points[1] - self.cubes[0].coord('time').points[0])
+        time_i = (time - self.time0) / (self.time1 - self.time0)
 
         # TODO check for out of bounds
         coord = np.vstack((time_i, pres_i, lat_i, lon_i))
 
+        # TODO The wrap around also wraps around the time, which does not give the correct behaviour.
         north = ndimage.map_coordinates(cube_n, coord, order=1, mode='wrap')
         east = ndimage.map_coordinates(cube_e, coord, order=1, mode='wrap')
         return north, east
