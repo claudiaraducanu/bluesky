@@ -35,6 +35,7 @@ import numpy as np
 from bluesky import settings
 
 from bluesky.ui.qtgl.dds import DDSTexture
+msg1282 = False # GL error 1282 when quitting should only be reported once
 
 # Register settings defaults
 settings.set_variable_defaults(gfx_path='data/graphics')
@@ -55,8 +56,8 @@ class Texture(QOpenGLTexture):
             self.allocateStorage()
             self.setCompressedData(len(tex.data), tex.data)
         else:
-            self.setData(QImage('data/graphics/world_small.jpg'))
-            self.tex.setWrapMode(self.tex.Repeat)
+            self.setData(QImage(fname))
+            self.setWrapMode(QOpenGLTexture.Repeat)
 
 
 class GLBuffer:
@@ -86,6 +87,7 @@ class GLBuffer:
             print('GLBuffer: Warning, trying to send more data to buffer than allocated size.')
         gl.glBindBuffer(self.target, self.buf_id)
         gl.glBufferSubData(self.target, offset, min(self.buf_size, size), dbuf)
+        # TODO: master branch has try/except for buffer writes after closing context
 
     @staticmethod
     def _raw(data):
@@ -123,12 +125,33 @@ class ShaderSet(MutableMapping):
         super().__init__()
         self._programs = dict()
         self._ubos = dict()
+        self._spath = ''
         if ShaderSet.selected is None:
             self.select()
 
     def select(self):
         ''' Select this shader set. '''
         ShaderSet.selected = self
+
+    def update_ubo(self, uboname, *args, **kwargs):
+        ''' Update an uniform buffer object of this shader set. '''
+        ubo = self._ubos.get(uboname, None)
+        if not ubo:
+            raise KeyError('Uniform Buffer Object', uboname, 'not found in shader set.')
+        ubo.update(*args, **kwargs)
+
+    def set_shader_path(self, path):
+        ''' Set a search path for shader files. '''
+        self._spath = path
+
+    def load_shader(self, shader_name, vs, fs, gs=None, *args, **kwargs):
+        ''' Load a shader into this shader set.
+            default shader names are: normal, textured, and text. '''
+        vs = os.path.join(self._spath, vs)
+        fs = os.path.join(self._spath, fs)
+        if gs:
+            gs = os.path.join(self._spath, gs)
+        self[shader_name] = ShaderProgram(vs, fs, gs, *args, **kwargs)
 
     def __getitem__(self, key):
         ret = self._programs.get(key, None)
@@ -146,7 +169,7 @@ class ShaderSet(MutableMapping):
             if ubo is None:
                 ubo = GLBuffer.createubo(size)
                 self._ubos[name] = ubo
-                setattr(self, name, ubo)
+
             program.bind_uniform_buffer(name, ubo)
 
     def __delitem__(self, key):
@@ -278,6 +301,9 @@ class VertexAttributeObject(object):
         def enable(self):
             gl.glEnableVertexAttribArray(self.loc)
 
+        def update(self, *args, **kwargs):
+            self.buf.update(*args, **kwargs)
+
         def bind(self, data, usage=gl.GL_STATIC_DRAW, instance_divisor=0, datatype=gl.GL_FLOAT, stride=0, offset=None, normalize=False):
             if VertexAttributeObject.bound_vao is not self.parent.vao_id:
                 gl.glBindVertexArray(self.parent.vao_id)
@@ -325,28 +351,52 @@ class VertexAttributeObject(object):
             # Add this attribute to enabled attributes
             self.parent.enabled_attributes.append(self)
 
-    def __init__(self, primitive_type=None, first_vertex=0, vertex_count=0, n_instances=0, shader_type='normal', **attribs):
+    def __init__(self, primitive_type=None, n_instances=0, shader_type='normal', texture=None, **attribs):
         # Get attributes for the target shader type
         self.shader_type = shader_type
         for name, attr in ShaderSet.selected[self.shader_type].attribs.items():
             setattr(self, name, VertexAttributeObject.Attrib(name, attr.loc, attr.size, self))
+        
         self.vao_id = gl.glGenVertexArrays(1)
         self.enabled_attributes = list()
         self.primitive_type = primitive_type
-        self.first_vertex = first_vertex
-        self.vertex_count = vertex_count
+        self.first_vertex = 0
+        self.vertex_count = 0
         self.n_instances = n_instances
         self.max_instance_divisor = 0
         self.single_color = None
 
+        # Set texture if passed
+        self.texture = None
+        if texture:
+            self.texture = Texture(texture)
+            if shader_type == 'normal':
+                self.shader_type = 'textured'
+
         # Set passed attributes
         self.set_attribs(**attribs)
+
+    def set_primitive_type(self, primitive_type):
+        self.primitive_type = primitive_type
 
     def set_vertex_count(self, count):
         self.vertex_count = int(count)
 
     def set_first_vertex(self, vertex):
         self.first_vertex = vertex
+
+    def update(self, **attribs):
+        ''' Update one or more buffers for this object. '''
+        for name, data in attribs.items():
+            attrib = getattr(self, name, None)
+            if not isinstance(attrib, VertexAttributeObject.Attrib):
+                raise KeyError('Unknown attribute ' + name)
+            # Special attribs: color and vertex
+            if name == 'vertex' and isinstance(data, Collection):
+                self.vertex_count = np.size(data) // 2
+
+            # Update the buffer of the attribute
+            attrib.update(data)
 
     def set_attribs(self, usage=gl.GL_STATIC_DRAW, instance_divisor=0, datatype=gl.GL_FLOAT, stride=0, offset=None, normalize=False, **attribs):
         for name, data in attribs.items():
@@ -381,11 +431,13 @@ class VertexAttributeObject(object):
         if vertex_count == 0:
             return
 
-        # ShaderSet.selected[self.shader_type].use()
+        ShaderSet.selected[self.shader_type].use()
         self.bind()
 
         if self.single_color is not None:
             gl.glVertexAttrib4Nub(self.color.loc, *self.single_color)
+        elif self.texture:
+            self.texture.bind()
 
         if n_instances > 0:
             gl.glDrawArraysInstanced(primitive_type, first_vertex, vertex_count, n_instances * self.max_instance_divisor)
@@ -402,8 +454,9 @@ class VertexAttributeObject(object):
     def copy(cls, original):
         """ Copy a render object from one context to the other.
         """
-        new = VertexAttributeObject(original.primitive_type, original.first_vertex,
-            original.vertex_count, original.n_instances, original.shader_type)
+        new = VertexAttributeObject(original.primitive_type, original.n_instances, original.shader_type)
+        new.first_vertex = original.first_vertex
+        new.vertex_count = original.vertex_count
 
         # Bind the same attributes for the new renderobject
         # [size, buf_id, instance_divisor, datatype]
@@ -421,11 +474,16 @@ class VertexAttributeObject(object):
         return new
 
 
-class Shape(VertexAttributeObject):
-    ''' Convenience class for drawing different shapes. '''
+class RenderObject:
+    ''' Convenience class for drawing different (nested) objects. '''
 
-    def __init__(self, linecolor=None, fill=None, *args, **kwargs):
-        pass
+    def __init__(self):
+        self.children = list()
+
+    def draw(self, *args, **kwargs):
+        for child in self.children:
+            child.draw(*args, **kwargs)
+
 
 class Circle(VertexAttributeObject):
     ''' Convenience class for a circle. '''
@@ -499,7 +557,7 @@ class Font(object):
         return vertices, texcoords
 
     def prepare_text_string(self, text_string, char_size=16.0, text_color=(0.0, 1.0, 0.0), vertex_offset=(0.0, 0.0)):
-        ret = VertexAttributeObject(gl.GL_TRIANGLES, vertex_count=6 * len(text_string), shader_type='text')
+        ret = VertexAttributeObject(gl.GL_TRIANGLES, shader_type='text')
 
         vertices, texcoords = [], []
         w, h = char_size, char_size * self.char_ar
@@ -509,23 +567,23 @@ class Font(object):
             vertices  += v
             texcoords += t
 
-        ret.vertex.bind(np.array(vertices, dtype=np.float32))
-        ret.texcoords.bind(np.array(texcoords, dtype=np.float32))
-        ret.color.bind(np.array(text_color, dtype=np.uint8))
+        ret.set_attribs(vertex=np.array(vertices, dtype=np.float32),
+                        texcoords=np.array(texcoords, dtype=np.float32),
+                        color=np.array(text_color, dtype=np.uint8))
 
         ret.char_size  = char_size
         ret.block_size = (len(text_string), 1)
         return ret
 
     def prepare_text_instanced(self, text_array, textblock_size, origin_lat=None, origin_lon=None, text_color=None, char_size=16.0, vertex_offset=(0.0, 0.0)):
-        ret       = VertexAttributeObject(gl.GL_TRIANGLES, vertex_count=6, shader_type='text')
+        ret       = VertexAttributeObject(gl.GL_TRIANGLES, shader_type='text')
         w, h      = char_size, char_size * self.char_ar
         x, y      = vertex_offset
         v, t      = self.char(x, y, w, h)
         vertices  = v
         texcoords = t
-        ret.vertex.bind(np.array(vertices, dtype=np.float32))
-        ret.texcoords.bind(np.array(texcoords, dtype=np.float32))
+        ret.set_attribs(vertex=np.array(vertices, dtype=np.float32),
+                        texcoords=np.array(texcoords, dtype=np.float32))
 
         ret.texdepth.bind(text_array, instance_divisor=1, datatype=gl.GL_UNSIGNED_BYTE)
         divisor = textblock_size[0] * textblock_size[1]
