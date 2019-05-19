@@ -18,7 +18,7 @@ gribdatadir = os.path.join("data", 'grib')
 server = ECMWFDataServer()
 
 
-def grib2netcdf(fpath,filename):
+def _grib2netcdf(fpath,filename):
     """
     Call the ecCodes API function from command line to
     convert grib file to netcdf to use in windiris.py
@@ -40,7 +40,7 @@ def grib2netcdf(fpath,filename):
         print("Converted .grb to .nc .")
 
 
-def tigge_pf_pl_request(date, time, target):
+def _tigge_pf_pl_request(date, time, step, target):
     '''
        A TIGGE request for perturbed forecast, pressure level, ECMWF Center.
        Please note that a subset of the available data is requested below.
@@ -61,14 +61,14 @@ def tigge_pf_pl_request(date, time, target):
                   "/38/39/40/41/42/43/44/45/46/47/48/49/50",
         "origin": "ecmf",
         "param": "131/132",
-        "step": "120",
+        "step": "{}".format(step),
         "time": "%02d:00:00" % time,
         "type": "pf",
         "target": "%s" % target,
     })
 
 
-def fetch_grib_from_ecmwf(year, month, day, hour):
+def fetch_grib_from_ecmwf(year, month, day, hour, step):
     """
     Fetch from the TIGGE dataset propabilistic forecasts
     ( TYPE: perturbed forecast,  LEVEL of TYPE: pressure levels)
@@ -87,14 +87,14 @@ def fetch_grib_from_ecmwf(year, month, day, hour):
 
     # date from which to retrive perturbed wind forecast
     ymd = "%04d-%02d-%02d" % (year, month, day)
-    fname = "tigge_%s_%02d.grb" % (ymd, hour) # grib filename
+    fname = "tigge_%s_%02d_%03d.grb" % (ymd, hour, step) # grib filename
 
     fpath = os.path.join(gribdatadir,fname) # grib file location
 
     if not os.path.isfile(fpath):
         print("Downloading %s" % fname)
         # MARS request
-        tigge_pf_pl_request(ymd,hour,fpath)
+        _tigge_pf_pl_request(ymd,hour,fpath)
 
     print("Download completed.")
 
@@ -103,7 +103,11 @@ def fetch_grib_from_ecmwf(year, month, day, hour):
     if not os.path.exists(nc_datadir):
         os.makedirs(nc_datadir)
 
-    grib2netcdf(fpath,fname.split(".")[0]) # Convert grib file to netcdf
+    _grib2netcdf(fpath,fname.split(".")[0]) # Convert grib file to netcdf
 
-
-fetch_grib_from_ecmwf(2018, 10, 14, 0 )
+# TIGGE retrieval efficiency (https://confluence.ecmwf.int/display/WEBAPI/TIGGE+retrieval+efficiency)
+# The best way to iterate over dates
+# for date in dates
+#     for time in times
+#         TIGGE-request(date, time, origin)
+#         (Here you must add everything you need)
