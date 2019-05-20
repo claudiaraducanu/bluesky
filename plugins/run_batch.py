@@ -40,6 +40,7 @@ class Batch:
         pass
 
     def start(self, ic, nc):
+
         folder = '/home/remonvandenbra/repo/bluesky/scenario/batch'
         for f in os.listdir(folder):
             if f.endswith('.scn'):

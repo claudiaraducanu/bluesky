@@ -105,13 +105,13 @@ class FuelLogger(TrafficArrays):
 
         self.data_log   = None
 
-        with RegisterElementParameters(self):
-            self.at_wpt                 = np.array([],dtype = np.bool) # At next active way-point
-            self.initial_mass           = np.array([])
+        # with RegisterElementParameters(self):
+        #     self.at_wpt                 = np.array([],dtype = np.bool) # At next active way-point
+        #     self.initial_mass           = np.array([])
 
-    def create(self, n=1):
-        super(FuelLogger, self).create(n)
-        self.initial_mass[-n:] = traf.perf.mass[-n:]
+    # def create(self, n=1):
+        # super(FuelLogger, self).create(n)
+        # self.initial_mass[-n:] = traf.perf.mass[-n:]
 
     def update(self):
         """Find out which aircraft are currently at their destination, and
@@ -149,8 +149,9 @@ class FuelLogger(TrafficArrays):
 
         # if all args are empty, then print out the current area status
         if not args:
-            return True, "Fuel logging is currently " + ("ON" if self.active else "OFF")
+            return True, "Logging at way-point with FLOG is currently " + ("ON" if self.active else "OFF")
         elif isinstance(args[0],bool):
+
             if args[0]:
                 self.active = True
                 self.data_log = pd.DataFrame(columns=header) # dataframe in which logging information is saved
@@ -159,18 +160,13 @@ class FuelLogger(TrafficArrays):
                 # switch off fuel logging
                 self.active = False
 
-                timestamp = datetime.now().strftime('%Y%m%d_%H-%M-%S')
-                fname = os.path.join(os.getcwd(),settings.log_path,"%s_%s_%s.pkl" %("CONDITIONAL", stack.get_scenname(), timestamp))
-
-                if self.data_log is not None:
-                    with open(fname, "wb") as f:
-                        pickle.dump(self.data_log, f)
+                # timestamp = datetime.now().strftime('%Y%m%d_%H-%M-%S')
+                # fname = os.path.join(os.getcwd(),settings.log_path,"%s_%s_%s.pkl" %("CONDITIONAL", stack.get_scenname(), timestamp))
 
                 return True, "FLOG is switched : OFF"
         else:
             return False,  "Incorrect arguments" + \
                            "\nFLOG ON/OFF "
-
 
 def preupdate():
     pass
