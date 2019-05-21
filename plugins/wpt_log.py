@@ -8,7 +8,7 @@ import numpy as np
 
 logger = None
 header = [' ']
-selvars = ['id', 'lat', 'lon', 'alt', 'gs','cas', 'mass']
+selvars = ['id', 'lat', 'lon', 'alt', 'gs','cas', 'mass','wind']
 logprecision = '%.8f'
 
 ### Initialization function of your plugin. Do not change the name of this
@@ -103,16 +103,16 @@ class logWpt(TrafficArrays):
                 # determine if next waypoint is destination
                 next_wpt_dest = np.isclose(traf.actwp.lat, self.last_wpt_lat, rtol=0.001) & \
                                 np.isclose(traf.actwp.lon, self.last_wpt_lon, rtol=0.001)
-                print(next_wpt_dest)
+
                 # aircraft for which next waypoint is destination
                 idx_next_wpt_dest_y = [idx for idx, st in enumerate(next_wpt_dest) if st]
 
                 if len(idx_next_wpt_dest_y) > 0:
-                    print(idx_next_wpt_dest_y)
+
                     # Calculate for each aircraft when it reaches its destination and log data then
 
-                    is_ac_at_dest = np.isclose(traf.lat, self.last_wpt_lat, rtol=0.001) & \
-                                    np.isclose(traf.lon, self.last_wpt_lon, rtol=0.001)
+                    is_ac_at_dest = np.isclose(traf.lat, self.last_wpt_lat, rtol=0.0001) & \
+                                    np.isclose(traf.lon, self.last_wpt_lon, rtol=0.0001)
 
                     idx_is_ac_at_dest = [idx for idx, st in enumerate(is_ac_at_dest) if st]
 

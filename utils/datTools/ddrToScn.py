@@ -114,26 +114,39 @@ class FlightPlan():
                                              str(self.data.iloc[0].fl) + "00",
                                              spd]) + "\n"
 
-    def start_simulation(self,log_type=None,period=0.1,variables='id,lat,lon,alt,traf.perf.mass'):
+    def start_simulation(self):
         """
         Include VNAV,LNAV,op,ff stack commands. These are the commands that start the simulation in BlueSky.
         In addition here is where you create a log file
+
+        :return: string of VNAV,LNAV,op,ff stack commands
+        """
+
+        return "0:00:00.00>lnav {} ON \n0:00:00.00>vnav {} ON \n00:00:00.00>op \n00:00:00.05>ff\n".\
+            format(self.acid, self.acid)
+
+    def start_log(self,log_type,period=1.0,variables='id,lat,lon,alt,gs,cas,traf.perf.mass'):
+        """
+
         :param log_type: select way in which to log information and give appropriate stack command
         :param period: if log_type is periodic, the select period between logging information
         :param varaibles: string of variables to log data
-        :return: string of VNAV,LNAV,op,ff stack commands
+        :return:
         """
-        # TODO add the other log type
-        if log_type == 'periodic':
+        if  log_type == 'periodic':
 
-            return "00:00:00.00>lnav {} ON \n00:00:00.00>vnav {} ON\n".format(self.acid, self.acid) + \
-                    "0:00:00.00>crelog STANDARD {} \n".format(period) + \
+            return  "0:00:00.00>crelog STANDARD {} \n".format(period) + \
                     "0:00:00.00>STANDARD ADD {}\n".format(variables) + \
-                    "0:00:00.00>STANDARD ON\n" + \
-                    "0:00:00.00> op \n0:00:00.05>ff"
-        else:
-            return "0:00:00.00>lnav {} ON \n0:00:00.00>vnav {} ON \n00:00:00.00>op \n00:00:00.05>ff".\
-            format(self.acid, self.acid)
+                    "0:00:00.00>STANDARD ON\n"
+
+        elif log_type == 'waypoint':
+
+            return  "0:00:00.00>PLUGINS LOAD WPTLOG \n" + \
+                    "0:00:00.00>WPTLOG ON\n"
+
+    def get_route(self):
+
+        return "0:00:00.00>DUMPRTE {}\n".format(self.acid)
 
     def initialise_simulation(self):
         """
@@ -157,7 +170,7 @@ class FlightPlan():
             defwpt = '0:00:00.00>defwpt ' + 'wpt_{}'.format(idx) + ' ' + \
                      str(self.data.iloc[idx].x_coord) + ' ' + \
                      str(self.data.iloc[idx].y_coord) + ' ' + \
-                     'fix\n'
+                     '\n'
             all_defwpt.append(defwpt)
 
         return "".join(all_defwpt)
