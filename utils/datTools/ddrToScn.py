@@ -185,15 +185,13 @@ class FlightPlan():
 
         for idx in range(1, self.data.index.size):
 
-            if idx == 1:
 
-                wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
-                                                           'FL{}'.format(str(self.data.iloc[idx].fl))]) + "\n"
-            else:
-                wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
+            spd, hdg = self._avg_spd(self.data.iloc[idx-1], self.data.iloc[idx])
+
+            wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
                                                        'FL{}'.format(str(self.data.iloc[idx].fl)),
-                                                       '',
-                                                       'wpt_{} '.format(idx - 1)]) + "\n"
+                                                       '{}'.format( str(np.round(spd, decimals=0))) + "\n"])
+
             all_after.append(wpt)
 
         return "".join(all_after)

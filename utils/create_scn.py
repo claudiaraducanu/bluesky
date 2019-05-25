@@ -6,12 +6,13 @@ import os
 # Print current working directory
 print("Current working directory : %s" % os.getcwd()) # make sure its BlueSky main
 sys.path.insert(0, os.getcwd())
-from utils.datTools import ddrToScn
+from utils.datTools import ddrToScn, grib2wind
 
 if __name__ == "__main__":
 
     ddr_dirName = os.path.join(os.getcwd(), "data", "ddr")
     scn_dirName = os.path.join(os.getcwd(), "scenario", "trajectories",datetime.datetime.now().strftime("%d-%m-%Y"))
+
 
     # Create target Directory if don't exist
     if not os.path.exists(scn_dirName):
@@ -20,6 +21,8 @@ if __name__ == "__main__":
     else:
         print("Directory ", scn_dirName, " already exists")
 
+    wind = grib2wind.fetchWind()
+
     for root, dirs, files in os.walk(ddr_dirName):
         for name in files:
             if not name.startswith('.'):
@@ -27,6 +30,7 @@ if __name__ == "__main__":
                 fpath = os.path.join(ddr_dirName, name)
                 print("Loading trajectory of flight ", os.path.splitext(name)[0], "...")
                 scenario = ddrToScn.FlightPlan(fpath,cruise=True)
+                wind.fetch_grib_from_ecmwf(scenario.date.year,scenario.date.month,scenario.date.day)
 
                 with open(os.path.join(scn_dirName, scenario.acid + "_" +
                                                     datetime.datetime.now().strftime("%H-%M-%S")  + '.scn'),"w") \
