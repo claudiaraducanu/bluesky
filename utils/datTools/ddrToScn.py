@@ -186,11 +186,11 @@ class FlightPlan():
         for idx in range(1, self.data.index.size):
 
 
-            spd, hdg = self._avg_spd(self.data.iloc[idx-1], self.data.iloc[idx])
+            # spd, hdg = self._avg_spd(self.data.iloc[idx-1], self.data.iloc[idx])
 
             wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
-                                                       'FL{}'.format(str(self.data.iloc[idx].fl)),
-                                                       '{}'.format( str(np.round(spd, decimals=0))) + "\n"])
+                                                       'FL{}'.format(str(self.data.iloc[idx].fl)) + "\n"])
+                                                       # '{}'.format( str(np.round(spd, decimals=0))) + "\n"])
 
             all_after.append(wpt)
 

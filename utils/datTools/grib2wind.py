@@ -12,14 +12,27 @@ import os
 class fetchWind():
 
     def __init__(self):
+
         # Add new data directories from which to retrieve files
         self.netcdfdatadir = os.path.join(os.getcwd(), "data", 'netcdf')
         self.gribdatadir = os.path.join(os.getcwd(), "data", 'grib')
-        # ECMWF server
+
+        if not os.path.exists(self.gribdatadir):
+            os.makedirs(self.gribdatadir)
+        if not os.path.exists(self.netcdfdatadir):
+            os.makedirs(self.netcdfdatadir)
+
+        # ECMWF servers
+
         self.server = ECMWFDataServer()
 
+    @staticmethod
+    def merge(input_file,output):
 
-    def _grib2netcdf(self,fpath,filename):
+        # TODO change to be able to take more than 2 files in
+        subprocess.call(["grib_copy", input_file[0], input_file[1], output])
+
+    def grib2netcdf(self,grib_fpath):
         """
         Call the ecCodes API function from command line to
         convert grib file to netcdf to use in windiris.py
@@ -28,20 +41,22 @@ class fetchWind():
         """
 
         # Netcdf output file
+        netcdf_fpath = os.path.join(self.netcdfdatadir,
+                                    os.path.splitext(grib_fpath)[0].split("/")[-1] + ".nc")
 
-        netcdf_filename = os.path.join(self.netcdfdatadir,"%s.nc" %filename)
-        print(netcdf_filename)
-        if not os.path.exists(netcdf_filename):
+
+        print(netcdf_fpath)
+        if not os.path.exists(netcdf_fpath):
 
             # Grib file to be converted to netcdf
-            print(fpath)
             subprocess.call(["grib_to_netcdf", "-o",
-                            netcdf_filename,
-                            fpath])
+                            netcdf_fpath,
+                            grib_fpath])
             print("Converted .grb to .nc .")
 
 
-    def _tigge_pf_pl_request(self,date, target):
+
+    def _tigge_pf_pl_request(self,date,time,target):
         '''
            A TIGGE request for perturbed forecast, pressure level, ECMWF Center.
            Please note that a subset of the available data is requested below.
@@ -50,7 +65,7 @@ class fetchWind():
         self.server.retrieve({
             "class": "ti",
             "dataset": "tigge",
-            "date": "%s" % date,
+            "date": "{}".format(date),
             "expver": "prod",
             "grid": "0.5/0.5",
             "levelist": "200/250/300/500/700/850/925/1000",
@@ -63,13 +78,12 @@ class fetchWind():
             "origin": "ecmf",
             "param": "131/132",
             "step": "0",
-            "time": "00:00:00/12:00:00",
+            "time": "{}".format(time),
             "type": "pf",
-            "target": "%s" % target,
+            "target": "{}".format(target),
         })
 
-
-    def fetch_grib_from_ecmwf(self,year, month, day):
+    def fetch_grib_from_ecmwf(self,year, month, day,time):
         """
         Fetch from the TIGGE dataset propabilistic forecasts
         ( TYPE: perturbed forecast,  LEVEL of TYPE: pressure levels)
@@ -81,33 +95,23 @@ class fetchWind():
         :return:
         """
 
-        grib_datadir = os.path.join(os.getcwd(),self.gribdatadir)
-        # Check if grib data directory exists, such that .grib files can be saved
-        if not os.path.exists(grib_datadir):
-            os.makedirs(grib_datadir)
-
         # date from which to retrive perturbed wind forecast
-        ymd = "%04d-%02d-%02d" % (year, month, day)
-        fname = "tigge_%s.grb" % (ymd) # grib filename
+        fname = "ecmwf_pl_%04d-%02d-%02d_%02d.grb" % (year, month, day, time)
 
         fpath = os.path.join(self.gribdatadir,fname) # grib file location
 
         if not os.path.isfile(fpath):
             print("Downloading %s" % fname,"...")
             # MARS request
-            self._tigge_pf_pl_request(ymd,fpath)
+            self._tigge_pf_pl_request("%04d-%02d-%02d" % (year, month, day),
+                                      "%02d" % (time),
+                                      fpath)
         else:
-            print("Download already completed.")
+            print("Download %s" %fname, "completed.")
 
-        nc_datadir = os.path.join(os.getcwd(), self.netcdfdatadir)
-        # Check if netcdf data directory exists, such that .nc files can be saved
-        if not os.path.exists(nc_datadir):
-            os.makedirs(nc_datadir)
-
-        self._grib2netcdf(fpath,fname.split(".")[0]) # Convert grib file to netcdf
-
-if __name__ == "__main__":
-    fetchWind().fetch_grib_from_ecmwf(2014,9,9)
+        return fpath
+# if __name__ == "__main__":
+#     fetchWind().fetch_grib_from_ecmwf(2014,9,9)
 
 # TIGGE retrieval efficiency (https://confluence.ecmwf.int/display/WEBAPI/TIGGE+retrieval+efficiency)
 # The best way to iterate over dates

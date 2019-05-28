@@ -7,6 +7,7 @@ import os
 print("Current working directory : %s" % os.getcwd()) # make sure its BlueSky main
 sys.path.insert(0, os.getcwd())
 from utils.datTools import ddrToScn, grib2wind
+from netCDF4 import Dataset
 
 if __name__ == "__main__":
 
@@ -30,7 +31,26 @@ if __name__ == "__main__":
                 fpath = os.path.join(ddr_dirName, name)
                 print("Loading trajectory of flight ", os.path.splitext(name)[0], "...")
                 scenario = ddrToScn.FlightPlan(fpath,cruise=True)
-                wind.fetch_grib_from_ecmwf(scenario.date.year,scenario.date.month,scenario.date.day)
+
+                if scenario.date.hour <= 12.0:
+                    times = [0,12]
+                    input_file = []
+
+                    # TODO include for time when hour is after midday
+                    for time in times:
+                        input_file.append(wind.fetch_grib_from_ecmwf(scenario.date.year,
+                                               scenario.date.month,
+                                               scenario.date.day,
+                                               time))
+                    print("________________________________\n")
+                    merge_out_file = os.path.join(wind.gribdatadir,"ecmwf_pl_%04d-%02d-%02d_00-12.grb" % (scenario.date.year,
+                                               scenario.date.month, scenario.date.day))
+                    if not os.path.exists(merge_out_file):
+                        wind.merge(input_file,merge_out_file)
+                        print("Merged %s \n%s" % (input_file[0],input_file[1]),"\ninto\n",merge_out_file)
+                        print("________________________________\n")
+
+                    wind.grib2netcdf(merge_out_file)
 
                 with open(os.path.join(scn_dirName, scenario.acid + "_" +
                                                     datetime.datetime.now().strftime("%H-%M-%S")  + '.scn'),"w") \
