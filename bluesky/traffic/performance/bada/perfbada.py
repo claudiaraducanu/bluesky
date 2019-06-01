@@ -406,7 +406,7 @@ class PerfBADA(TrafficArrays):
         maxthr = Tj*self.jet + Tt*self.turbo + Tp*self.piston
 
         # 2. level flight: Thr = D.
-        Tlvl = lvl*self.D
+        Tlvl = lvl * ( self.D + bs.traf.ax * self.mass)
 
         # 3. Descent: condition: vs negative/ H>hdes: fixed formula. H<hdes: phase cr, ap, ld
 
