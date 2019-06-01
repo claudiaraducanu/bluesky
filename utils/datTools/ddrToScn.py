@@ -23,7 +23,8 @@ class FlightPlan():
 
         self.data = self._import_data(fpath,cruise)
         self.acid = fpath.split("/")[-1].split(".")[0] # get the acid from file title
-        self.date = self.data.iloc[0].time_over # date on which flight takes place
+        self.date_start = self.data.iloc[0].time_over # date on which flight takes place
+        self.date_end = self.data.iloc[-1].time_over # date on which flight takes place
         self.ac_type = self.data.iloc[0].ac_type # type of ac that executes trajectory
 
     @staticmethod
@@ -153,8 +154,8 @@ class FlightPlan():
         Include HOLD, DATE stack command.
         :return: string of HOLD, DATE stack commands
         """
-        return "00:00:00.00>hold \n00:00:00.00>date {}\n".format(self.date.strftime("%d %m %Y %H:%M:%S.00")) + \
-                self._cre()
+        return "00:00:00.00>hold \n00:00:00.00>date {}\n".format(self.date_start.strftime("%d %m %Y %H:%M:%S.00")) + \
+               self._cre()
 
 
     def defwpt_command(self):
