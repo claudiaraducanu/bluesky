@@ -43,77 +43,109 @@ class WindIris:
     def __init__(self):
 
         self.winddim = 3
-        self.cubes       = np.array([])
+        self.filename = None
+
+        self.cubes       = []
         self.grid_lat    = [] # [deg]
         self.grid_lon    = [] # [deg]
         self.pressure = []
         self.forecasts_time = []
+        self.realisations = []
+
         self.north_mean = []
         self.east_mean = []
-        self.realisations = []
         self.north = []
         self.east = []
 
-        self.selected_realisation = None
-        self._current_ensemble = None
-        self._check_loaded_ensemble = False
+        self.current_ensemble = None
+        self.ensemble_loaded = False
 
 
-    def load_file(self, ensemble, filename):
+    def load_file(self, filename):
         """
          Load netCDF file into memory.
-        :param ensemble: The number of the ensemble initially loaded.
         :param filename: The location of the netCDF file to be loaded.
         :return:
         """
 
         # load cubes, first the northward wind, then the eastward wind
+        # load cubes, first the northward wind, then the eastward wind
+        if self.filename != filename or self.filename is None:
 
-        self.cubes                = iris.load(filename.lower(), ['northward_wind', 'eastward_wind'])
-        self.selected_realisation = ensemble
+            self.filename = filename
 
-        # convert pressure level from milibars to pascal 200 mbar = 20000 Pa
-        self.cubes[0].coord('pressure_level').convert_units('pascal')
-        self.cubes[1].coord('pressure_level').convert_units('pascal')
+            self.cubes = iris.load(self.filename.lower(), ['northward_wind', 'eastward_wind'])
 
-        # get lat,lon,pressure
-        self.grid_lat = self.cubes[0].coord('latitude').points   # [deg]
-        self.grid_lon = self.cubes[0].coord('longitude').points  # [deg]
+            # convert pressure level from milibars to pascal 200 mbar = 20000 Pa
+            self.cubes[0].coord('pressure_level').convert_units('pascal')
+            self.cubes[1].coord('pressure_level').convert_units('pascal')
 
-        self.grid_lat_spacing = abs(self.grid_lat[1] - self.grid_lat[0])
-        self.grid_lon_spacing = abs(self.grid_lon[1] - self.grid_lon[0])
+            # get lat,lon,pressure
+            self.grid_lat = self.cubes[0].coord('latitude').points   # [deg]
+            self.grid_lon = self.cubes[0].coord('longitude').points  # [deg]
 
-        self.pressure           = self.cubes[0].coord('pressure_level').points # [PA]
+            self.grid_lat_spacing = abs(self.grid_lat[1] - self.grid_lat[0])
+            self.grid_lon_spacing = abs(self.grid_lon[1] - self.grid_lon[0])
 
-        # These are the times used in the simulation
-        self.forecasts_time     = self.cubes[0].coord('time').points #
+            self.pressure           = self.cubes[0].coord('pressure_level').points # [PA]
 
-        if self.cubes[0].coords('ensemble_member'):
+            # These are the times used in the simulation
+            self.forecasts_time     = self.cubes[0].coord('time').points #
 
-            # Save the ensemble members
-            self.realisations = self.cubes[0].coord('ensemble_member').points
+            if self.cubes[0].coords('ensemble_member'):
 
-            # mean value of wind over all ensemble members (assumed to be included in the GS)
-            # ignore the warning that it generates because it just means there is a gap in the data
-            # This can happen with a bounded coordinate if the bounds don't "touch".
-            # For example if the bound values were (0 to 10), (10 to 20), and (25 to 35),
-            # then there is a gap between 20 and 25. But the post-collapse coordinate would
-            # just have bounds of (0, 35) which wouldn't capture the gap.
+                # Save the ensemble members
+                self.realisations = self.cubes[0].coord('ensemble_member').points
 
-            self.north_mean = self.cubes[0].collapsed('ensemble_member', iris.analysis.MEAN).data # [m/s]
-            self.east_mean = self.cubes[1].collapsed('ensemble_member', iris.analysis.MEAN).data  # [m/s]
+                # mean value of wind over all ensemble members (assumed to be included in the GS)
+                # ignore the warning that it generates because it just means there is a gap in the data
+                # This can happen with a bounded coordinate if the bounds don't "touch".
+                # For example if the bound values were (0 to 10), (10 to 20), and (25 to 35),
+                # then there is a gap between 20 and 25. But the post-collapse coordinate would
+                # just have bounds of (0, 35) which wouldn't capture the gap.
+
+                self.north_mean = self.cubes[0].collapsed('ensemble_member', iris.analysis.MEAN).data # [m/s]
+                self.east_mean = self.cubes[1].collapsed('ensemble_member', iris.analysis.MEAN).data  # [m/s]
+
+            else:
+
+                self.realisations = np.array([])
+                self.north = self.cubes[0].data # [m/s]
+                self.east = self.cubes[1].data  # [m/s]
+
+            self.current_ensemble = None
+
+            txt = "WIND LOADED FROM {}".format(self.filename)
+
+            return True, txt
+
+    def load_ensemble(self,ensemble):
+
+        # check if cubes contains ensemble members
+        if ensemble in self.realisations:
+
+
+            # if ens member is different from the one currently loaded
+
+            if self.current_ensemble is not ensemble:
+
+                self.north = self.cubes[0].extract(iris.Constraint(ensemble_member=ensemble)).data - \
+                             self.north_mean
+                self.east = self.cubes[1].extract(iris.Constraint(ensemble_member=ensemble)).data - \
+                            self.east_mean
+
+            self.current_ensemble = ensemble
+            self.ensemble_loaded  = True
+
+            txt = "ENSEMBLE MEMBER {}".format(self.current_ensemble)
+
+            return True, txt
 
         else:
+            self.ensemble_loaded = False
+            txt = "ENSEMBLE MEMBER {}".format(self.current_ensemble)
 
-            self.realisations = np.array([])
-            self.north = self.cubes[0].data # [m/s]
-            self.east = self.cubes[1].data  # [m/s]
-
-        self._current_ensemble = None
-        self._load_ensemble()
-
-        self._check_loaded_ensemble = True
-
+            return True, txt
 
 
     def getdata(self, userlat, userlon, useralt):
@@ -125,34 +157,20 @@ class WindIris:
         :return: two np.array containting the north component and east component of the wind.
         """
 
-        if self._check_loaded_ensemble:
+        if self.filename:
             # TODO: find a faster alternative to date2num
 
-            pressure = vatmos(useralt)[0]
-            time = date2num(bs.sim.utc, units='hours since 1900-01-01 00:00:0.0', calendar='gregorian')
+            if self.ensemble_loaded:
 
-            if self.selected_realisation:
-                self._load_ensemble()
+                pressure = vatmos(useralt)[0]
+                time = date2num(bs.sim.utc, units='hours since 1900-01-01 00:00:0.0', calendar='gregorian')
+                return self.__interpolate(userlat, userlon, pressure, time)
 
-            return self.__interpolate(userlat, userlon, pressure, time)
+            else:
+                return 0,0
 
         else:
             return 0, 0
-
-
-    def _load_ensemble(self):
-        # check if cubes contains ensemble members
-        if self.selected_realisation in self.realisations:
-            # if ens member is different from the one currently loaded
-
-            if self._current_ensemble is not self.selected_realisation:
-
-                self.north = self.cubes[0].extract(iris.Constraint(ensemble_member=self.selected_realisation)).data - \
-                             self.north_mean
-                self.east = self.cubes[1].extract(iris.Constraint(ensemble_member=self.selected_realisation)).data - \
-                            self.east_mean
-
-            self._current_ensemble = self.selected_realisation
 
 
     def __interpolate(self, lat, lon, pressure, time):
