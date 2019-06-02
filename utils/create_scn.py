@@ -71,7 +71,7 @@ if __name__ == "__main__":
                     scnfile.write(scenario.initialise_simulation())
                     scnfile.write(scenario.defwpt_command())
                     scnfile.write(scenario.addwpt_command())
-                    scnfile.write(scenario.start_log(log_type='waypoint'))
+                    # scnfile.write(scenario.start_log(log_type='waypoint'))
                     scnfile.write(scenario.get_route())
                     scnfile.write(scenario.start_simulation())
 
