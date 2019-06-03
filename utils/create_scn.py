@@ -16,7 +16,6 @@ if __name__ == "__main__":
                                datetime.datetime.now().strftime("%d-%m-%Y"))
 
 
-
     # Create target Directory if don't exist
     if not os.path.exists(scn_dirName):
         os.mkdir(scn_dirName)
@@ -65,8 +64,7 @@ if __name__ == "__main__":
 
                 grib2wind.grib2netcdf(output) # convert to netcdf
 
-                with open(os.path.join(scn_dirName, scenario.acid  + "_" +
-                                                    datetime.datetime.now().strftime("%H-%M-%S")  + '.scn'),"w") \
+                with open(os.path.join(scn_dirName, scenario.acid + '.scn'),"w") \
                         as scnfile:
                     scnfile.write(scenario.initialise_simulation())
                     scnfile.write(scenario.defwpt_command())
