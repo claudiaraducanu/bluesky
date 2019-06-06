@@ -3,8 +3,11 @@ import os
 import datetime
 import numpy as np
 
-class Batch:
+class Batch():
+
     def __init__(self):
+
+        super(Batch, self).__init__()
 
         self.ic = []
         self.nc = []
@@ -13,17 +16,15 @@ class Batch:
                                datetime.datetime.now().strftime("%d-%m-%Y"))
         self.wind_path     = os.path.join(settings.data_path,"netcdf")
 
-        self.ensembles = []
-
-        self.current_ic = 0
-        self.current_ensemble = 1
+        # self.running = False
+        self.current_scn     = 0
+        self.current_member  = 1
 
     def update(self):
-        # it the batch is running, check if the ac has landed
+
+        #it the batch is running, check if the ac has landed
+        print("Simulation state:",sim.state)
         # if self.running:
-        #     if not sim.ffmode:
-        #         stack.stack('run')
-        #         stack.stack('FF')
         #
         #     if not self.takeoff and traf.alt[0] > 10:
         #         self.takeoff = True
@@ -34,25 +35,26 @@ class Batch:
         #         self._next()
         # else:
         #     self.start('test', 'data/weather/1day.nc')
-        pass
 
     def preupdate(self):
+
         pass
 
     def reset(self):
 
         self.ic = []
         self.nc = []
-        self.ensembles = []
-        self.current_ic = None
-        self.current_ensemble = None
+
+        self.running = False
+        self.acid    = 0
+        self.memebr  = None
 
     def set_batchsim(self,*args):
 
         # if no arguments provided return the current status of the plugin
         if not args:
             return True, "SIMBATCH is running scenario file: {}".format(self.current_ic) + \
-                         "\nCurrently with wind ensemble member: {}".format(self.current_ensemble)
+                         "\nCurrently with wind ensemble member: {}".format(self.current_member)
 
         # Make sure only one argument provided
         if len(args) == 1:
@@ -98,7 +100,6 @@ class Batch:
 
                 # Wind files.
                 # scenario file names without extension
-                name_files = np.core.defchararray.rstrip(scn_files,'.scn')
 
                 wind_extension = np.ones(name_files.shape, dtype="U3")
                 wind_extension[:] = 'nc'
@@ -114,17 +115,16 @@ class Batch:
                 self.ic = self.ic[idx_wfiles]
                 name_files = name_files[idx_wfiles]
 
+                stack.stack('load_wind {}'.format(self.nc[self.current_scn]))
+                stack.stack('ensemble_member {}'.format(self.current_member))
+                stack.stack('IC {}'.format(self.ic[self.acid]))
+
                 return True, "SIMBATCH files : {}".format(name_files) + \
                              "\navailable to simulate"
 
         else:
             return False,"Incorrect number of arguments" + '\nBATCHSIM acid or\n BATCHSIM . '
 
-        # self.nc = nc
-        # stack.stack('load_wind {} {}'.format(self.current_ens, self.nc))
-        # self.running = True
-        # self._next()
-        # stack.stack('IC batch/{}'.format(self.ic[0]))
         pass
 
     @staticmethod
@@ -138,23 +138,26 @@ class Batch:
         else:
             return None
 
-
     def _next(self):
-        # self.ensembles = traf.wind.ens
-        # if self.current_scn > len(self.ic)-1:  # if end of scns?)
+
+        # if self.acid > len(self.ic)-1:  # if end of scns?)
+        #
         #     if self.current_ens < len(self.ensembles):
         #         self.current_ens = self.current_ens + 1
         #         print(self.current_ens)
         #         stack.stack('load_wind {} {}'.format(self.current_ens, self.nc))
         #         self.current_scn = 0
         #         self._next()
+        #
         #     else:  # done, store data and go home
         #         df = pd.DataFrame(columns=['id', 'time', 'fuel'], data=self.results_list)
         #         pickle.dump(df, open('output/results.p', 'wb'))
+        #
         # else:  # switch to the next scn file
         #     stack.stack('IC batch/{}'.format(self.ic[self.current_scn]))
         #     self.current_scn = self.current_scn + 1
         #     self.takeoff = False
+
         pass
 
 
@@ -177,7 +180,7 @@ def init_plugin():
         # Update interval in seconds. By default, your plugin's update function(s)
         # are called every timestep of the simulation. If your plugin needs less
         # frequent updates provide an update interval.
-        'update_interval': 1.0,
+        'update_interval': 0.05,
 
         # The update function is called after traffic is updated. Use this if you
         # want to do things as a result of what happens in traffic. If you need to

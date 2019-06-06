@@ -148,8 +148,7 @@ class FlightPlan():
 
         elif log_type == 'waypoint':
 
-            return  "0:00:00.00>PLUGINS LOAD WPTLOG \n" + \
-                    "0:00:00.00>WPTLOG ON\n"
+            return  "0:00:00.00>WPTLOG ON\n"
 
     def get_route(self):
 
