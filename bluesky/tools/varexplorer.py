@@ -1,5 +1,4 @@
 ''' BlueSky variable explorer
-
     Provide flexible access to simulation data in BlueSky.
 '''
 from numbers import Number
