@@ -14,10 +14,8 @@ header = \
     "Flight Statistics\n" + \
     "#######################################################\n\n" + \
     "Parameters [Units]:\n" + \
-    "Deletion Time [s], " + \
+    "Flight Time [s], " + \
     "Call sign [-], " + \
-    "Spawn Time [s], " + \
-    "Flight time [s], " + \
     "Ensemble Member [-], " + \
     "Latitude [deg], " + \
     "Longitude [deg], " + \
@@ -100,18 +98,23 @@ class logWpt(TrafficArrays):
         self.logger = datalog.crelog('WPTLOG', None, header)
 
         with RegisterElementParameters(self):
-            self.initial_mass                    = np.array([])
-            self.create_time                     = np.array([])
             self.last_wpt_in_route        = np.array([])
             self.actwp_in_route_preupdate        = np.array([])
             self.actwp_in_route_update           = np.array([])
 
-    def create(self, n=1):
-        super(logWpt, self).create(n)
+    def log_data(self,idx):
 
-        self.create_time[-n:] = sim.simt
-        self.initial_mass[-n:] = traf.perf.mass[-n:]
-
+        self.logger.log(
+            np.array(traf.id)[idx],
+            traf.wind.current_ensemble,
+            traf.lat[idx],
+            traf.lon[idx],
+            traf.alt[idx],
+            traf.tas[idx],
+            traf.cas[idx],
+            traf.gs[idx],
+            traf.perf.mass[idx],
+        )
 
     def update(self):
 
@@ -126,19 +129,7 @@ class logWpt(TrafficArrays):
             # Log flight statistics when for aircraft that switches waypoint
             if len(switch_wpt_idx) > 0:
 
-                self.logger.log(
-                    np.array(traf.id)[switch_wpt_idx],
-                    self.create_time[switch_wpt_idx],
-                    sim.simt - self.create_time[switch_wpt_idx],
-                    traf.wind.current_ensemble,
-                    traf.lat[switch_wpt_idx],
-                    traf.lon[switch_wpt_idx],
-                    traf.alt[switch_wpt_idx],
-                    traf.tas[switch_wpt_idx],
-                    traf.cas[switch_wpt_idx],
-                    traf.gs[switch_wpt_idx],
-                    traf.perf.mass[switch_wpt_idx],
-                )
+                self.log_data(switch_wpt_idx)
                 # delete all aicraft in self.delidx
 
             # Determine the last wpt number
@@ -157,25 +148,10 @@ class logWpt(TrafficArrays):
 
                 if len(at_dest_idx) > 0:
 
-                    if len(switch_wpt_idx) > 0:
-                        self.logger.log(
-                            np.array(traf.id)[switch_wpt_idx],
-                            self.create_time[switch_wpt_idx],
-                            sim.simt - self.create_time[switch_wpt_idx],
-                            traf.wind.current_ensemble,
-                            traf.lat[switch_wpt_idx],
-                            traf.lon[switch_wpt_idx],
-                            traf.alt[switch_wpt_idx],
-                            traf.tas[switch_wpt_idx],
-                            traf.cas[switch_wpt_idx],
-                            traf.gs[switch_wpt_idx],
-                            traf.perf.mass[switch_wpt_idx],
-                        )
+                    self.log_data(at_dest_idx)
 
                     # delete all aicraft in self.delidx
                     traf.delete(at_dest_idx)
-                    stack.stack("WPTLOG OFF")
-                    stack.stack("HOLD")
 
     def preupdate(self):
 
@@ -201,20 +177,9 @@ class logWpt(TrafficArrays):
 
                 self.logger.start()
 
+                # Log the initial state of all the aircraft in the simulation
                 traffic_id = [idx for idx, st in enumerate(traf.id)]
-
-                self.logger.log(
-                    np.array(traf.id)[traffic_id],
-                    self.create_time[traffic_id],
-                    sim.simt - self.create_time[traffic_id],
-                    traf.lat[traffic_id],
-                    traf.lon[traffic_id],
-                    traf.alt[traffic_id],
-                    traf.tas[traffic_id],
-                    traf.cas[traffic_id],
-                    traf.gs[traffic_id],
-                    traf.perf.mass[traffic_id],
-                )
+                self.log_data(traffic_id)
 
                 self.active = True
                 return True, "WPTLOG logging is : {}".format(self.active)
