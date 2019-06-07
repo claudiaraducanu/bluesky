@@ -2,6 +2,8 @@ output
 scenario/ic.scn
 data/cache
 data/grib
+data/netcdf
+data/ddr
 data/performance/BADA/*
 !/data/performance/BADA/README.md
 

@@ -6,7 +6,7 @@ Date: 5.03.2019
 """
 import os
 import pandas as pd
-from bluesky.tools import aero,geo
+from bluesky.tools import aero, geo
 import numpy as np
 
 class FlightPlan():
@@ -23,7 +23,8 @@ class FlightPlan():
 
         self.data = self._import_data(fpath,cruise)
         self.acid = fpath.split("/")[-1].split(".")[0] # get the acid from file title
-        self.date = self.data.iloc[0].time_over # date on which flight takes place
+        self.date_start = self.data.iloc[0].time_over # date on which flight takes place
+        self.date_end = self.data.iloc[-1].time_over # date on which flight takes place
         self.ac_type = self.data.iloc[0].ac_type # type of ac that executes trajectory
 
     @staticmethod
@@ -93,9 +94,15 @@ class FlightPlan():
 
         time_lapse_second = pd.to_timedelta(wpt2.time_over - wpt1.time_over, unit='s').total_seconds() # in seconds
         time_lapse = np.divide(time_lapse_second, 3600) # convert to hr because kts is nm/h
-        spd = np.divide(dist, time_lapse) # in kts
 
-        return spd,hdg
+        v_tas = aero.kts * np.divide(dist, time_lapse) # in kts
+
+        h = aero.ft * np.mean(np.array([int("".join([str(wpt1.fl),"00"])),
+                                        int("".join([str(wpt2.fl), "00"]))]))
+
+        v_cas = aero.tas2cas(v_tas,h) / aero.kts
+
+        return v_cas,hdg
 
     def _cre(self):
         """
@@ -105,7 +112,7 @@ class FlightPlan():
         # TODO add code to accommodate option to start the simulation at the origin and end at destination
 
         spd,hdg = self._avg_spd(self.data.iloc[0],self.data.iloc[1])
-        spd = str(np.round(spd,decimals=0))
+        spd = str(int(spd))
 
         return '00:00:00.00>CRE ' + ", ".join([self.acid, self.ac_type,
                                              str(self.data.iloc[0].x_coord),
@@ -125,7 +132,7 @@ class FlightPlan():
         return "0:00:00.00>lnav {} ON \n0:00:00.00>vnav {} ON \n00:00:00.00>op \n00:00:00.05>ff\n".\
             format(self.acid, self.acid)
 
-    def start_log(self,log_type,period=1.0,variables='id,lat,lon,alt,gs,cas,traf.perf.mass'):
+    def start_log(self,log_type,period=1.0,variables='id,lat,lon,alt,gs,cas,traf.perf.mass,traf.'):
         """
 
         :param log_type: select way in which to log information and give appropriate stack command
@@ -141,8 +148,7 @@ class FlightPlan():
 
         elif log_type == 'waypoint':
 
-            return  "0:00:00.00>PLUGINS LOAD WPTLOG \n" + \
-                    "0:00:00.00>WPTLOG ON\n"
+            return  "0:00:00.00>WPTLOG ON\n"
 
     def get_route(self):
 
@@ -153,8 +159,8 @@ class FlightPlan():
         Include HOLD, DATE stack command.
         :return: string of HOLD, DATE stack commands
         """
-        return "00:00:00.00>hold \n00:00:00.00>date {}\n".format(self.date.strftime("%d %m %Y %H:%M:%S.00")) + \
-                self._cre()
+        return "00:00:00.00>hold \n00:00:00.00>date {}\n".format(self.date_start.strftime("%d %m %Y %H:%M:%S.00")) + \
+               self._cre()
 
 
     def defwpt_command(self):
@@ -185,15 +191,13 @@ class FlightPlan():
 
         for idx in range(1, self.data.index.size):
 
-            if idx == 1:
 
-                wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
-                                                           'FL{}'.format(str(self.data.iloc[idx].fl))]) + "\n"
-            else:
-                wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
+            spd, hdg = self._avg_spd(self.data.iloc[idx-1], self.data.iloc[idx])
+
+            wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
                                                        'FL{}'.format(str(self.data.iloc[idx].fl)),
-                                                       '',
-                                                       'wpt_{} '.format(idx - 1)]) + "\n"
+                                                       '{}'.format( str(int(spd))) + "\n"])
+
             all_after.append(wpt)
 
         return "".join(all_after)

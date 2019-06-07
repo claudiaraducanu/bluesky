@@ -7,9 +7,23 @@ from bluesky.tools import datalog, areafilter, geo, \
 import numpy as np
 
 logger = None
-header = [' ']
-selvars = ['id', 'lat', 'lon', 'alt', 'gs','cas', 'mass','wind']
-logprecision = '%.8f'
+# Log parameters for the flight statistics log
+header = \
+    "#######################################################\n" + \
+    "WAYPOINT LOG\n" + \
+    "Flight Statistics\n" + \
+    "#######################################################\n\n" + \
+    "Parameters [Units]:\n" + \
+    "Flight Time [s], " + \
+    "Call sign [-], " + \
+    "Ensemble Member [-], " + \
+    "Latitude [deg], " + \
+    "Longitude [deg], " + \
+    "Altitude [m], " + \
+    "TAS [m/s], " + \
+    "CAS [m/s] " + \
+    "GS  [m/s] " + \
+    "Mass [kg] "
 
 ### Initialization function of your plugin. Do not change the name of this
 ### function, as it is the way BlueSky recognises this file as a plugin.
@@ -79,102 +93,75 @@ class logWpt(TrafficArrays):
         self.active = False
         self.dt     = 1.0    # [s] frequency of area check (simtime)
         self.file   = None
-        self.header = header
-        self.selvars = selvars
+
+        # The WPTLOG logger
+        self.logger = datalog.crelog('WPTLOG', None, header)
 
         with RegisterElementParameters(self):
-            self.initial_mass                   = np.array([])
-            self.last_wpt_lat                 = np.array([traf.ap.route[idx].wplat[-1]
-                                                           for idx,st in enumerate(traf.id)])
-            self.last_wpt_lon                 = np.array([traf.ap.route[idx].wplon[-1]
-                                                           for idx,st in enumerate(traf.id)])
+            self.last_wpt_in_route        = np.array([])
+            self.actwp_in_route_preupdate        = np.array([])
+            self.actwp_in_route_update           = np.array([])
 
-    def create(self, n=1):
-        super(logWpt, self).create(n)
-        self.initial_mass[-n:] = traf.perf.mass[-n:]
+    def log_data(self,idx):
+
+        self.logger.log(
+            np.array(traf.id)[idx],
+            traf.wind.current_ensemble,
+            traf.lat[idx],
+            traf.lon[idx],
+            traf.alt[idx],
+            traf.tas[idx],
+            traf.cas[idx],
+            traf.gs[idx],
+            traf.perf.mass[idx],
+        )
 
     def update(self):
 
         if not self.active:
             pass
         else:
-            # make sure there are still aircraft
-            if traf.id:
-                # determine if next waypoint is destination
-                next_wpt_dest = np.isclose(traf.actwp.lat, self.last_wpt_lat, rtol=0.001) & \
-                                np.isclose(traf.actwp.lon, self.last_wpt_lon, rtol=0.001)
 
-                # aircraft for which next waypoint is destination
-                idx_next_wpt_dest_y = [idx for idx, st in enumerate(next_wpt_dest) if st]
+            self.actwp_in_route_update[-1:] = [traf.ap.route[idx].iactwp for idx, st in enumerate(traf.id)]
+            switch_wpt     = np.equal(self.actwp_in_route_preupdate,self.actwp_in_route_update)
+            switch_wpt_idx = np.where(switch_wpt == False)[0]
 
-                if len(idx_next_wpt_dest_y) > 0:
+            # Log flight statistics when for aircraft that switches waypoint
+            if len(switch_wpt_idx) > 0:
 
-                    # Calculate for each aircraft when it reaches its destination and log data then
+                self.log_data(switch_wpt_idx)
+                # delete all aicraft in self.delidx
 
-                    is_ac_at_dest = np.isclose(traf.lat, self.last_wpt_lat, rtol=0.0001) & \
-                                    np.isclose(traf.lon, self.last_wpt_lon, rtol=0.0001)
+            # Determine the last wpt number
+            self.last_wpt_in_route[-1:] = [len(traf.ap.route[idx].wplat)-1 for idx, st in enumerate(traf.id)]
 
-                    idx_is_ac_at_dest = [idx for idx, st in enumerate(is_ac_at_dest) if st]
+            acwpt_dest         = np.equal(self.last_wpt_in_route,self.actwp_in_route_update)
+            acwpt_dest_idx     = np.where(acwpt_dest)[0]
 
-                    # if an aircraft is at the destination
-                    if len(idx_is_ac_at_dest) > 0:
 
-                        for idx in idx_is_ac_at_dest:
-                            self.log(idx)
-                            stack.stack("DEL {}".format(traf.id[idx]))
+            #Log flight statistics when for aircraft that switches waypoint
+            if len(acwpt_dest_idx) > 0:
 
-                idx_next_wpt_dest_n = [idx for idx, st in enumerate(next_wpt_dest) if not st]
+                at_dest = np.isclose(traf.lat, traf.actwp.lat, rtol=0.0001) & \
+                                np.isclose(traf.lon, traf.actwp.lon, rtol=0.0001)
+                at_dest_idx = np.where(at_dest)[0]
 
-                if len(idx_next_wpt_dest_n) > 0:
+                if len(at_dest_idx) > 0:
 
-                    at_wpt = np.isclose(self.preupdate_actwpt_lat,np.array(traf.actwp.lat),rtol= 0.00001) & \
-                             np.isclose(self.preupdate_actwpt_lon,np.array(traf.actwp.lon),rtol= 0.00001)
+                    self.log_data(at_dest_idx)
 
-                    idx_at_wpt  = [idx for idx,st in enumerate(at_wpt) if not st]
-
-                    if len(idx_at_wpt) > 0:
-
-                        for idx in idx_at_wpt:
-                            self.log(idx)
-
-            else:
-                stack.stack("WPTLOG OFF")
-                stack.stack("QUIT")
+                    # delete all aicraft in self.delidx
+                    traf.delete(at_dest_idx)
 
     def preupdate(self):
+
         if not self.active:
             pass
         else:
-
-            self.preupdate_actwpt_lat = np.array(traf.actwp.lat)
-            self.preupdate_actwpt_lon = np.array(traf.actwp.lon)
-
+            self.actwp_in_route_preupdate[-1:] = [traf.ap.route[idx].iactwp for idx, st in enumerate(traf.id)]
 
     def reset(self):
-
-        if self.file:
-            self.file.close()
-            self.file = None
-        self.active = False
-
-    def log(self, idx):
-
-        varlist = [sim.simt, traf.id[idx],
-                   traf.lat[idx],
-                   traf.lon[idx],
-                   traf.alt[idx],
-                   traf.gs[idx],
-                   traf.cas[idx],
-                   traf.perf.mass[idx]]
-
-        # Convert all elements in the  list that are floats to strings with precision 8
-        for i, v in enumerate(varlist):
-            if isinstance(v, float):
-                varlist[i] = logprecision % v
-
-        # log the data to file
-        np.savetxt(self.file, np.vstack(varlist).T,
-                   delimiter=',', newline='\n', fmt='%s')
+        pass
 
     ### Other functions of your plugin
     def set(self,*args):
@@ -185,40 +172,25 @@ class logWpt(TrafficArrays):
                         ("ON" if self.active else "OFF")
 
         elif isinstance(args[0], bool):
+
             if args[0]:
 
-                # Create log file name
-                filename = datalog.makeLogfileName("WPTLOG")
+                self.logger.start()
 
-                # if file exists close it and open again
-                if self.file:
-                    self.file.close()
-                self.file = open(filename, 'wb')
-                # Write the header
-                for line in self.header:
-                    self.file.write(bytearray('# ' + line + '\n', 'ascii'))
-                # Write the column contents
-                columns = ['simt']
-                for var in self.selvars:
-                    columns.append(var)
-                self.file.write(
-                    bytearray('# ' + str.join(', ', columns) + '\n', 'ascii'))
+                # Log the initial state of all the aircraft in the simulation
+                traffic_id = [idx for idx, st in enumerate(traf.id)]
+                self.log_data(traffic_id)
 
-                for idx,id in enumerate(traf.id):
-                    self.log(idx)
-
-                if self.file:
-                    scr.echo("Data logged in " + filename)
-                    self.active = True
-
+                self.active = True
                 return True, "WPTLOG logging is : {}".format(self.active)
 
             else:
                 # switch off fuel logging
-                self.reset()
+                self.logger.reset()
+                self.active = False
                 return True, "WPTLOG is switched : {}".format(self.active)
-        else:
-            return False, "Incorrect arguments" + \
+
+        return False, "Incorrect arguments" + \
                    "\nWPTLOG ON/OFF "
 
 

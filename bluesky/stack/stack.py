@@ -526,10 +526,16 @@ def init(startup_scnfile):
             "Show list of route in window per page of 5 waypoints"
         ],
         "LOAD_WIND": [
-            "LOAD_WIND ensemble, filename",
-            "int, string",
+            "LOAD_WIND filename",
+            "string",
             bs.traf.wind.load_file,
             "Load NetCDF Weather file"
+        ],
+        "ENSEMBLE_MEMBER": [
+            "ENSEMBLE_MEMBER ensemble",
+            "int",
+            bs.traf.wind.load_ensemble,
+            "Load member of the wind ensemble"
         ],
         "LNAV": [
             "LNAV acid,[ON/OFF]",

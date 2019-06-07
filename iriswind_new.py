@@ -118,19 +118,14 @@ class WindIris:
             txt = "WIND LOADED FROM {}".format(self.filename)
 
             return True, txt
-        else:
-            txt = "WIND FROM {}".format(self.filename)
-
-            return True, txt
-
 
     def load_ensemble(self,ensemble):
 
         # check if cubes contains ensemble members
         if ensemble in self.realisations:
 
+
             # if ens member is different from the one currently loaded
-            self.ensemble_loaded  = True
 
             if self.current_ensemble is not ensemble:
 
@@ -139,19 +134,19 @@ class WindIris:
                 self.east = self.cubes[1].extract(iris.Constraint(ensemble_member=ensemble)).data - \
                             self.east_mean
 
-                self.current_ensemble = ensemble
+            self.current_ensemble = ensemble
+            self.ensemble_loaded  = True
 
-                txt = "WIND LOADED ENSEMBLE MEMBER {}".format(self.current_ensemble)
+            txt = "ENSEMBLE MEMBER {}".format(self.current_ensemble)
 
-                return True, txt
-            else:
-
-                txt = "WIND LOADED ENSEMBLE MEMBER {}".format(self.current_ensemble)
-                return True, txt
+            return True, txt
 
         else:
             self.ensemble_loaded = False
-            return False, "MEMBER NOT IN ENSEBLE"
+            txt = "ENSEMBLE MEMBER {}".format(self.current_ensemble)
+
+            return True, txt
+
 
     def getdata(self, userlat, userlon, useralt):
         """
