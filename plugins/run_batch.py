@@ -140,6 +140,8 @@ class Batch(TrafficArrays):
 
         super(Batch, self).__init__()
 
+        self.active = False
+
         self.ic = []
         self.nc = []
         # self.running = False
@@ -152,27 +154,29 @@ class Batch(TrafficArrays):
 
     def update(self):
         #When all aircraft get deleted.
+        if not self.active:
+            pass
+        else:
+            if not sim.ffmode:
+                stack.stack("FF")
 
-        if not sim.ffmode:
-            stack.stack("FF")
+            if len(traf.id) == 0:
+                stack.stack("HOLD")
+                self.current_member += 1
 
-        if len(traf.id) == 0:
-            stack.stack("HOLD")
-            self.current_member += 1
-
-            if self.current_member <= traf.wind.realisations.size:
-                stack.stack('ensemble_member {}'.format(self.current_member))
-                stack.stack('IC {}'.format(self.ic[self.current_scn]))
-            else:
-                stack.stack("WPTLOG OFF")
-                self.current_scn += 1
-                if self.current_scn < len(self.ic):
-                    stack.stack('load_wind {}'.format(self.nc[self.current_scn]))
-                    self.current_member = 1 # Restart the
+                if self.current_member <= traf.wind.realisations.size:
                     stack.stack('ensemble_member {}'.format(self.current_member))
                     stack.stack('IC {}'.format(self.ic[self.current_scn]))
                 else:
-                    stack.stack('QUIT')
+                    stack.stack("WPTLOG OFF")
+                    self.current_scn += 1
+                    if self.current_scn < len(self.ic):
+                        stack.stack('load_wind {}'.format(self.nc[self.current_scn]))
+                        self.current_member = 1 # Restart the
+                        stack.stack('ensemble_member {}'.format(self.current_member))
+                        stack.stack('IC {}'.format(self.ic[self.current_scn]))
+                    else:
+                        stack.stack('QUIT')
 
     def preupdate(self):
         pass
@@ -206,6 +210,10 @@ class Batch(TrafficArrays):
                 stack.stack('load_wind {}'.format(self.nc[self.current_scn]))
                 stack.stack('ensemble_member {}'.format(self.current_member))
                 stack.stack('IC {}'.format(self.ic[self.current_scn]))
+
+                if len(self.ic) != 0:
+                    self.active = True
+
 
                 return True, "SIMBATCH files : {}".format(name_files) + \
                              "\navailable to simulate"

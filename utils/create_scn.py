@@ -10,6 +10,8 @@ from utils.datTools import ddrToScn, grib2wind
 
 if __name__ == "__main__":
 
+    wspd = input("Include speed at waypoint")
+
     ddr_dirName = os.path.join(os.getcwd(), "data", "ddr")
     grib_dirName = os.path.join(os.getcwd(), "data", "grib")
     scn_dirName = os.path.join(os.getcwd(), "scenario", "trajectories",
@@ -43,7 +45,9 @@ if __name__ == "__main__":
                 # into the trajectories object as a data frame.
                 fpath = os.path.join(ddr_dirName, name)
                 print("Loading trajectory of flight ", os.path.splitext(name)[0], "...")
+
                 scenario = ddrToScn.FlightPlan(fpath,cruise=True)
+                print("End Time ",scenario.date_end.time(),"Start",scenario.date_start.time())
 
                 dates = []
 
@@ -68,7 +72,7 @@ if __name__ == "__main__":
                         as scnfile:
                     scnfile.write(scenario.initialise_simulation())
                     scnfile.write(scenario.defwpt_command())
-                    scnfile.write(scenario.addwpt_command())
+                    scnfile.write(scenario.addwpt_command(with_spd=wspd))
                     scnfile.write(scenario.start_log(log_type='waypoint'))
                     # scnfile.write(scenario.get_route())
                     scnfile.write(scenario.start_simulation())

@@ -17,7 +17,7 @@ class FlightPlan():
 
         :param fpath: Complete path of file which contains trajectory data in ddr format. The file type has to
         either be .csv or .xlsx and the filename must be the aircraft acid code (e.g. ADH931.csv)
-        :param cruise: True, if only cruise trajectory way-points are selected ( FL > FL150), False if all way-points
+        :param cruise: True, if only cruise trajectory way-points are selected ( FL >= FL150), False if all way-points
         from origin to destination are to be included.
         """
 
@@ -181,7 +181,7 @@ class FlightPlan():
 
         return "".join(all_defwpt)
 
-    def addwpt_command(self):
+    def addwpt_command(self,with_spd=True):
         """
         Defines the sequence of way-points, for the BlueSKy FMS, that the aircraft must follow.
         :return:
@@ -191,13 +191,15 @@ class FlightPlan():
 
         for idx in range(1, self.data.index.size):
 
+            if with_spd:
+                spd, hdg = self._avg_spd(self.data.iloc[idx-1], self.data.iloc[idx])
 
-            spd, hdg = self._avg_spd(self.data.iloc[idx-1], self.data.iloc[idx])
-
-            wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
+                wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
                                                        'FL{}'.format(str(self.data.iloc[idx].fl)),
                                                        '{}'.format( str(int(spd))) + "\n"])
-
+            else:
+                wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
+                                                       'FL{}'.format(str(self.data.iloc[idx].fl) + "\n")])
             all_after.append(wpt)
 
         return "".join(all_after)

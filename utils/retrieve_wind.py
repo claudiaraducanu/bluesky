@@ -34,7 +34,10 @@ if __name__ == "__main__":
                 if scenario.date_start.hour >= 12 or scenario.date_end.hour >= 12:
                     dates.append((scenario.date_start.date() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"))
 
-                dates = set(dates)
+                seen = set()
+                seen_add = seen.add
+                dates = [x for x in dates if not (x in seen or seen_add(x))]
+
                 targets = grib2wind.retrieve_tigge_data(dates,times)
 
                 output = os.path.join(grib_dirName, ".".join([os.path.splitext(name)[0],"grb"]))

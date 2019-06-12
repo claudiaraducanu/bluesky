@@ -11,7 +11,7 @@ def merge_gribfile(output,input_file):
         subprocess.call(["grib_copy", input_file[0], input_file[1], output])
 
     elif len(input_file) == 3:
-        subprocess.call(["grib_copy", input_file[0], input_file[1], input_file[2],output])
+        subprocess.call(["grib_copy", input_file[0], input_file[1], input_file[2], output])
 
     else:
         subprocess.call(["grib_copy", input_file[0], input_file[1], input_file[2], input_file[3],output])
