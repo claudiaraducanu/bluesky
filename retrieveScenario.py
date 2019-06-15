@@ -5,21 +5,33 @@ from utils.datTools import ddrToScn
 if __name__ == "__main__":
 
     ddrDirName = os.path.join("data", "ddr")
-    scnDirName = os.path.join("scenario", "trajectories", datetime.datetime.now().strftime("%d_%m_%Y"))
-    print(scnDirName)
+
+    print("_______________________________________________________________")
+    twWidth = input("Select type of time window to initiate scenario file\n"
+                    "Options available are none, 0, 1, 5, 10, 15 or 60 minutes: ")
+
+    if isinstance(twWidth, str) and len(twWidth) > 0:
+
+        if int(twWidth) == 0:
+            scnDirName = os.path.join("scenario", datetime.datetime.now().strftime("%d-%m-%Y"),"rta")
+        else:
+            scnDirName = os.path.join("scenario", datetime.datetime.now().strftime("%d-%m-%Y"),"tw_{}".format(twWidth))
+        twWidth = int(twWidth)
+
+    else:
+        twWidth = None
+        scnDirName = os.path.join("scenario", datetime.datetime.now().strftime("%d-%m-%Y"))
+
     # Create target Directory if don't exist
     if not os.path.exists(scnDirName):
-        os.mkdir('hello')
+        os.makedirs(scnDirName)
         print("Directory ", scnDirName, " created ")
-    else:
-        print('-')
 
     print("_______________________________________________________________")
 
     for root, dirs, files in os.walk(ddrDirName):
         for name in files:
             if not name.startswith('.'):
-
 
                 # into the trajectories object as a data frame.
                 fpath = os.path.join(ddrDirName, name)
