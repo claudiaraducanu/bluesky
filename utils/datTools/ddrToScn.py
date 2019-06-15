@@ -183,7 +183,7 @@ class FlightPlan():
 
         return "".join(all_defwpt)
 
-    def addwpt_command(self):
+    def addwpt_command(self,with_spd=True):
         """
         Defines the sequence of way-points, for the BlueSKy FMS, that the aircraft must follow.
         :return:
@@ -193,13 +193,15 @@ class FlightPlan():
 
         for idx in range(1, self.data.index.size):
 
+            if with_spd:
+                spd, hdg = self._avg_spd(self.data.iloc[idx-1], self.data.iloc[idx])
 
-            spd, hdg = self._avg_spd(self.data.iloc[idx-1], self.data.iloc[idx])
-
-            wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
+                wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
                                                        'FL{}'.format(str(self.data.iloc[idx].fl)),
                                                        '{}'.format( str(int(spd))) + "\n"])
-
+            else:
+                wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
+                                                       'FL{}'.format(str(self.data.iloc[idx].fl) + "\n")])
             all_after.append(wpt)
 
         return "".join(all_after)
@@ -220,4 +222,28 @@ class FlightPlan():
 
         return "".join(rtas)
 
+    def twSize_command(self,wptList,twSize):
+        """
+        :param wpt:
+        :return:
+        """
+        rtas = []
 
+        for wpt in wptList:
+
+            rtaCmd =  "0:00:00.00>{} ".format(self.acid) + "TW_SIZE_AT " + "wpt_{} ".format(str(wpt)) + \
+                        str(twSize) + "\n"
+            rtas.append(rtaCmd)
+
+        return "".join(rtas)
+
+    def afms_command(self,wptList,twType):
+
+        rtas = []
+
+        for wpt in wptList:
+
+            rtaCmd =  "0:00:00.00>{} ".format(self.acid) + "AFMS_FROM " + "wpt_{} ".format(str(wpt)) + twType + "\n"
+            rtas.append(rtaCmd)
+
+        return "".join(rtas)

@@ -37,6 +37,7 @@ if __name__ == "__main__":
                 # into the trajectories object as a data frame.
                 fpath = os.path.join(ddrDirName, name)
                 print("Loading trajectory of flight ", os.path.splitext(name)[0], "...")
+                # TODO : make more flexible
                 scenario = ddrToScn.FlightPlan(fpath,cruise=True)
                 rtaWpts      = [1,scenario.data.index.max()]
 
@@ -47,8 +48,18 @@ if __name__ == "__main__":
 
                     if twWidth is not None:
 
-                        scnfile.write(scenario.addwpt_command())
+                        scnfile.write(scenario.addwpt_command(with_spd=False))
                         scnfile.write(scenario.rta_command(rtaWpts))
+
+                        if twWidth > 0:
+                            scnfile.write(scenario.twSize_command(rtaWpts,twWidth))
+                            scnfile.write(scenario.afms_command(rtaWpts,"tw"))
+
+                        else:
+                            scnfile.write(scenario.afms_command(rtaWpts,"rta"))
+
+                    else:
+                        scnfile.write(scenario.addwpt_command(with_spd=True))
 
                     scnfile.write(scenario.start_log(log_type='waypoint'))
                     scnfile.write(scenario.start_simulation())
