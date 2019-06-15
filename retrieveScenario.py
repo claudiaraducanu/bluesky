@@ -46,7 +46,7 @@ if __name__ == "__main__":
                     scnfile.write(scenario.defwpt_command())
 
                     if twWidth is not None:
-                        
+
                         scnfile.write(scenario.addwpt_command())
                         scnfile.write(scenario.rta_command(rtaWpts))
 
