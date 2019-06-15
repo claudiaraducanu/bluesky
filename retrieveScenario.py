@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     else:
         twWidth = None
-        scnDirName = os.path.join("scenario", datetime.datetime.now().strftime("%d-%m-%Y"))
+        scnDirName = os.path.join("scenario", datetime.datetime.now().strftime("%d-%m-%Y"),str(twWidth))
 
     # Create target Directory if don't exist
     if not os.path.exists(scnDirName):
@@ -30,6 +30,7 @@ if __name__ == "__main__":
     print("_______________________________________________________________")
 
     for root, dirs, files in os.walk(ddrDirName):
+
         for name in files:
             if not name.startswith('.'):
 
@@ -37,14 +38,19 @@ if __name__ == "__main__":
                 fpath = os.path.join(ddrDirName, name)
                 print("Loading trajectory of flight ", os.path.splitext(name)[0], "...")
                 scenario = ddrToScn.FlightPlan(fpath,cruise=True)
+                rtaWpts      = [1,scenario.data.index.max()]
 
                 with open(os.path.join(scnDirName, scenario.acid + '.scn'),"w") \
                         as scnfile:
                     scnfile.write(scenario.initialise_simulation())
                     scnfile.write(scenario.defwpt_command())
-                    scnfile.write(scenario.addwpt_command())
+
+                    if twWidth is not None:
+                        
+                        scnfile.write(scenario.addwpt_command())
+                        scnfile.write(scenario.rta_command(rtaWpts))
+
                     scnfile.write(scenario.start_log(log_type='waypoint'))
-                    # scnfile.write(scenario.get_route())
                     scnfile.write(scenario.start_simulation())
 
                 print("Done")

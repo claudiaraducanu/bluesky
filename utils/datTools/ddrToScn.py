@@ -74,6 +74,8 @@ class FlightPlan():
         # Only get cruise waypoints
         if cruise:
             data = data.loc[data.fl > 150.]
+            data = data.reset_index()
+            data = data.drop('order',axis=1)
 
         return data
 
@@ -201,4 +203,21 @@ class FlightPlan():
             all_after.append(wpt)
 
         return "".join(all_after)
+
+    def rta_command(self,wptList):
+        """
+        :param wpt:
+        :return:
+        """
+        rtas = []
+
+        for wpt in wptList:
+
+            time = self.data.loc[wpt].time_over.time().strftime("%H:%M:%S")
+            rtaCmd =  "0:00:00.00>{} ".format(self.acid) + "RTA_AT " + "wpt_{} ".format(str(wpt)) + \
+                        time + "\n"
+            rtas.append(rtaCmd)
+
+        return "".join(rtas)
+
 
