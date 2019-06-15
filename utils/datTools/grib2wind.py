@@ -2,38 +2,18 @@ from ecmwfapi import ECMWFDataServer
 import subprocess
 import os
 
-def merge_gribfile(output,input_file):
-
-    if len(input_file) == 1:
-        raise Warning("Unsuccessful merge",
-                      "only one grib file provided for merge")
-    elif len(input_file) == 2:
-        subprocess.call(["grib_copy", input_file[0], input_file[1], output])
-
-    elif len(input_file) == 3:
-        subprocess.call(["grib_copy", input_file[0], input_file[1], input_file[2],output])
-
-    else:
-        subprocess.call(["grib_copy", input_file[0], input_file[1], input_file[2], input_file[3],output])
-
-
-def grib2netcdf(grib_fpath):
+def grib2netcdf(ncFilePath,grbFilePath):
     """
     Call the ecCodes API function from command line to
     convert grib file to netcdf to use in windiris.py
     :param filename:
     :return:
     """
-
-    # Netcdf output file
-    netcdf_fpath = os.path.join(os.path.join(os.getcwd(), "data", 'netcdf'),
-                                ".".join([os.path.splitext(grib_fpath)[0].split("/")[-1],"nc"]))
-
-    if not os.path.exists(netcdf_fpath):
+    if not os.path.exists(ncFilePath):
         # Grib file to be converted to netcdf
-        subprocess.call(["grib_to_netcdf", "-o", netcdf_fpath, grib_fpath])
+        subprocess.call(["grib_to_netcdf", "-o", grbFilePath, ncFilePath])
 
-def tigge_pf_pl_request(date,time,target):
+def tigge_pf_pl_request(date,time,step,target):
     '''
        A TIGGE request for perturbed forecast, pressure level, ECMWF Center.
        Please note that a subset of the available data is requested below.
@@ -55,23 +35,10 @@ def tigge_pf_pl_request(date,time,target):
                   "/38/39/40/41/42/43/44/45/46/47/48/49/50",
         "origin": "ecmf",
         "param": "131/132",
-        "step": "0",
+        "step": step,
         "time": time,
         "type": "pf",
         "target": target,
     })
-
-def retrieve_tigge_data(dates,times):
-
-    targets = []
-    for date in dates:
-        for time in times:
-
-            target = os.path.join(os.getcwd(), "data", 'grib','ecmwf_pl_%s_%s.grb' % (date, time))
-            targets.append(target)
-
-            if not os.path.isfile(target):
-                tigge_pf_pl_request(date, time, target)
-    return targets
 
 

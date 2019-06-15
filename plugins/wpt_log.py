@@ -107,6 +107,7 @@ class logWpt(TrafficArrays):
         self.logger.log(
             np.array(traf.id)[idx],
             traf.wind.current_ensemble,
+            np.array(traf.type)[idx],
             traf.lat[idx],
             traf.lon[idx],
             traf.alt[idx],
