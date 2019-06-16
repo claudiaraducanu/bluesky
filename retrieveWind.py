@@ -95,13 +95,12 @@ if __name__ == "__main__":
                     dateAnalysis = datesBeforeDeparture[idx].strftime("%Y-%m-%d")
                     stepsAnalysis  = "/".join(forecastSteps[idx].astype(str).tolist())
 
-                    target = 'ecmwf_pl_%s_%s_%s.grb' % (dateAnalysis, timeAnalysis,
+                    target = 'ecmwf_pl_%s_%s_%s.grb' % (dateDeparture.strftime("%Y-%m-%d"), timeAnalysis,
                                                         "-".join(forecastSteps[idx].astype(str).tolist()))
                     grbTargetAnalysis = os.path.join(grbDirPath,target)
 
                     if not os.path.isfile(grbTargetAnalysis):
                         grib2wind.tigge_pf_pl_request(dateAnalysis, timeAnalysis, stepsAnalysis, grbTargetAnalysis)
-                        # print(grbTargetAnalysis)
 
                     ncTargetAnalysis = os.path.join(ncDirPath,target)
                     grib2wind.grib2netcdf(ncTargetAnalysis,grbTargetAnalysis)

@@ -2,6 +2,7 @@ from bluesky import settings,stack, traf, sim
 from bluesky.tools import datalog,TrafficArrays,RegisterElementParameters
 import os
 import datetime
+import glob
 import numpy as np
 
 
@@ -45,10 +46,10 @@ def init_plugin():
         # The command name for your function
         'BATCHSIM': [
             # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
-            'BATCHSIM acid or BATCHSIM . ',
+            'BATCHSIM scenarioFilePath windFilePath',
 
             # A list of the argument types your function accepts. For a description of this, see ...
-            '[txt]',
+            '[txt,txt]',
 
             # The name of your function in this plugin
             batch.set_batchsim,
@@ -62,77 +63,77 @@ def init_plugin():
 
 
 
-def init_scn_files(var):
-
-    scenario_path = os.path.join(settings.scenario_path, "trajectories",
-                                      datetime.datetime.now().strftime("%d-%m-%Y"))
-
-    if len(var) == 1:
-
-        # For each file check: 1. if it has .scn extension
-        scn_files = np.array(os.listdir(scenario_path))
-        scn_files = scn_files[np.core.defchararray.endswith(scn_files, ".scn")]
-
-    # If the string length is larger than 1, this corresponds to an acid and therefore load
-    # only the file corresponding to it.
-    else:
-        # Add scn file extension
-        scn_files = np.array([".".join([var, "scn"])])
-
-    # Vectorized version of the function batch.findFile
-    vfindFile = np.vectorize(findFile)
-
-    # Scenario files.
-    scn_paths = np.ones(scn_files.shape, dtype="U32")
-    scn_paths[:] = scenario_path
-
-    ic = vfindFile(scn_files, scn_paths)
-
-    if ic[0] is None:
-        return None
-
-    else:
-        # Remove the "scenario/" from path.
-        ic = np.core.defchararray.lstrip(ic, "scenario/")
-        return ic,scn_files,vfindFile
-
-def init_wind_files(var):
-    # Wind files.
-    # scenario file names without extension
-    if var is None:
-        return var
-
-    elif len(var) == 3:
-        # scenario file names without extension
-        name_files = np.core.defchararray.rstrip(var[1], '.scn')
-
-        wind_path = os.path.join(settings.data_path, "netcdf")
-
-        wind_extension = np.ones(name_files.shape, dtype="U3")
-        wind_extension[:] = 'nc'
-
-        wind_paths = np.ones(name_files.shape, dtype="U11")
-        wind_paths[:] = wind_path
-
-        nc = var[2](name_files, wind_paths, wind_extension)
-        # Index of wind files that are available for simulation
-        idx_wfiles = np.where(nc != "None")
-
-        # Remove scenario files where there is no wind available for simulation
-        ic = var[0][idx_wfiles]
-        name_files = name_files[idx_wfiles]
-
-        return ic,nc,name_files
-
-def findFile(seekName, path, extension=None):
-
-    if extension:
-        seekName = ".".join([seekName, extension])
-
-    if os.path.isfile(os.path.join(path, seekName)):
-        return os.path.join(path, seekName)
-    else:
-        return None
+# def init_scn_files(var):
+#
+#     scenario_path = os.path.join(settings.scenario_path, "trajectories",
+#                                       datetime.datetime.now().strftime("%d-%m-%Y"))
+#
+#     if len(var) == 1:
+#
+#         # For each file check: 1. if it has .scn extension
+#         scn_files = np.array(os.listdir(scenario_path))
+#         scn_files = scn_files[np.core.defchararray.endswith(scn_files, ".scn")]
+#
+#     # If the string length is larger than 1, this corresponds to an acid and therefore load
+#     # only the file corresponding to it.
+#     else:
+#         # Add scn file extension
+#         scn_files = np.array([".".join([var, "scn"])])
+#
+#     # Vectorized version of the function batch.findFile
+#     vfindFile = np.vectorize(findFile)
+#
+#     # Scenario files.
+#     scn_paths = np.ones(scn_files.shape, dtype="U32")
+#     scn_paths[:] = scenario_path
+#
+#     ic = vfindFile(scn_files, scn_paths)
+#
+#     if ic[0] is None:
+#         return None
+#
+#     else:
+#         # Remove the "scenario/" from path.
+#         ic = np.core.defchararray.lstrip(ic, "scenario/")
+#         return ic,scn_files,vfindFile
+#
+# def init_wind_files(var):
+#     # Wind files.
+#     # scenario file names without extension
+#     if var is None:
+#         return var
+#
+#     elif len(var) == 3:
+#         # scenario file names without extension
+#         name_files = np.core.defchararray.rstrip(var[1], '.scn')
+#
+#         wind_path = os.path.join(settings.data_path, "netcdf")
+#
+#         wind_extension = np.ones(name_files.shape, dtype="U3")
+#         wind_extension[:] = 'nc'
+#
+#         wind_paths = np.ones(name_files.shape, dtype="U11")
+#         wind_paths[:] = wind_path
+#
+#         nc = var[2](name_files, wind_paths, wind_extension)
+#         # Index of wind files that are available for simulation
+#         idx_wfiles = np.where(nc != "None")
+#
+#         # Remove scenario files where there is no wind available for simulation
+#         ic = var[0][idx_wfiles]
+#         name_files = name_files[idx_wfiles]
+#
+#         return ic,nc,name_files
+#
+# def findFile(seekName, path, extension=None):
+#
+#     if extension:
+#         seekName = ".".join([seekName, extension])
+#
+#     if os.path.isfile(os.path.join(path, seekName)):
+#         return os.path.join(path, seekName)
+#     else:
+#         return None
 
 class Batch(TrafficArrays):
 
@@ -156,6 +157,7 @@ class Batch(TrafficArrays):
         #When all aircraft get deleted.
         if not self.active:
             pass
+
         else:
             if not sim.ffmode:
                 stack.stack("FF")
@@ -191,37 +193,59 @@ class Batch(TrafficArrays):
             return True, "SIMBATCH is running scenario file: {}".format(self.current_scn) + \
                          "\nCurrently with wind ensemble member: {}".format(self.current_member)
 
-        # Make sure only one argument provided
-        if len(args) == 1:
+        # Two arguments are required,
+        if len(args)  == 2:
 
-            # self.reset()
-            # Check if the string length is 1, in which case load all the scenario files from the
-            # associated scenario folder.
+            scenarioFilePath = args[0].lower()
+            ncFilePath     = args[1].lower()
 
-            initialisation_result = init_wind_files(init_scn_files(args[0]))
+            # Check if the two strings provided have a file extension,
+            # otherwise they are directories
+            scnExtension = os.path.splitext(scenarioFilePath)[1]
+            ncExtension  = os.path.splitext(ncFilePath)[1]
 
-            if initialisation_result:
 
-                self.ic,self.nc,name_files = initialisation_result[0],\
-                                             initialisation_result[1], \
-                                             initialisation_result[2]
+            # the string provided is a directory and therefore all files
+            # in the directory are analysed.
+
+            if len(scnExtension) == 0:
+                for root, dir, files in os.walk(scenarioFilePath):
+                    for f in files:
+                        if f.endswith('.scn'):
+                            self.ic.append(os.path.join(settings.scenario_path,
+                                                        datetime.datetime.now().strftime("%d-%m-%Y"),
+                                                        f))
+            else:
+                self.ic.append(os.path.join(settings.scenario_path,
+                                            datetime.datetime.now().strftime("%d-%m-%Y"),
+                                            scenarioFilePath))
+
+            if len(ncExtension) == 0:
+                for root, dir, files in os.walk(scenarioFilePath):
+                    for f in files:
+                        if f.endswith('.scn'):
+                            self.nc.append(os.path.join(settings.data_path,"netcdf",f))
+            else:
+                self.nc.append(os.path.join(settings.data_path,"netcdf",
+                                            datetime.datetime.now().strftime("%d-%m-%Y"),
+                                            ncFilePath))
 
                 # Load the appropriate wind file into memory
-                stack.stack('load_wind {}'.format(self.nc[self.current_scn]))
-                stack.stack('ensemble_member {}'.format(self.current_member))
-                stack.stack('IC {}'.format(self.ic[self.current_scn]))
+            stack.stack('load_wind {}'.format(self.nc[self.current_scn]))
+            stack.stack('ensemble_member {}'.format(self.current_member))
+            stack.stack('IC {}'.format(self.ic[self.current_scn]))
 
-                if len(self.ic) != 0:
-                    self.active = True
+            if len(self.ic) != 0:
+                self.active = True
 
-
-                return True, "SIMBATCH files : {}".format(name_files) + \
-                             "\navailable to simulate"
+                return True, "SIMBATCH files available to simulate"
 
             else:
+
                 return False, "SIMBATCH does not have any files loaded into memory"
         else:
-            return False,"Incorrect number of arguments" + '\nBATCHSIM acid or\n BATCHSIM . '
 
-        pass
+            return False,"Incorrect number of arguments" + '\nBATCHSIM scenarioFilePath windFilePath '
+
+
 
