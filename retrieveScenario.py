@@ -41,7 +41,8 @@ if __name__ == "__main__":
                 scenario = ddrToScn.FlightPlan(fpath,cruise=True)
                 rtaWpts      = [1,scenario.data.index.max()]
 
-                with open(os.path.join(scnDirName, scenario.acid + '.scn'),"w") \
+                with open(os.path.join(scnDirName, scenario.acid + "_" +
+                                                   scenario.date_start.strftime("%Y-%m-%d") + '.scn'),"w") \
                         as scnfile:
                     scnfile.write(scenario.initialise_simulation())
                     scnfile.write(scenario.defwpt_command())
