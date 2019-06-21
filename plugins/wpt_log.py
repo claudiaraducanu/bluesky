@@ -101,12 +101,19 @@ class logWpt(TrafficArrays):
             self.last_wpt_in_route        = np.array([])
             self.actwp_in_route_preupdate        = np.array([])
             self.actwp_in_route_update           = np.array([])
+            self.initial_mass = np.array([])
+
+    def create(self, n=1):
+        super(logWpt, self).create(n)
+        self.initial_mass[-n:] = traf.perf.mass
 
     def log_data(self,idx):
 
         self.logger.log(
             np.array(traf.id)[idx],
+            traf.wind.filename,
             traf.wind.current_ensemble,
+            traf.wind.filename,
             np.array(traf.type)[idx],
             traf.lat[idx],
             traf.lon[idx],
@@ -114,6 +121,7 @@ class logWpt(TrafficArrays):
             traf.tas[idx],
             traf.cas[idx],
             traf.gs[idx],
+            self.initial_mass[idx] - traf.perf.mass[idx],
             traf.perf.mass[idx],
         )
 

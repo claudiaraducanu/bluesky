@@ -4,7 +4,7 @@ import os
 import datetime
 import glob
 import numpy as np
-
+from adapt.move_output import move_output
 
 # Initialization function of your plugin. Do not change the name of this
 # function, as it is the way BlueSky recognises this file as a plugin.
@@ -46,10 +46,10 @@ def init_plugin():
         # The command name for your function
         'BATCHSIM': [
             # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
-            'BATCHSIM scenarioFilePath windFilePath',
+            'BATCHSIM scenario,logType',
 
             # A list of the argument types your function accepts. For a description of this, see ...
-            '[txt,txt]',
+            'txt,txt',
 
             # The name of your function in this plugin
             batch.set_batchsim,
@@ -61,80 +61,6 @@ def init_plugin():
     # init_plugin() should always return these two dicts.
     return config, stackfunctions
 
-
-
-# def init_scn_files(var):
-#
-#     scenario_path = os.path.join(settings.scenario_path, "trajectories",
-#                                       datetime.datetime.now().strftime("%d-%m-%Y"))
-#
-#     if len(var) == 1:
-#
-#         # For each file check: 1. if it has .scn extension
-#         scn_files = np.array(os.listdir(scenario_path))
-#         scn_files = scn_files[np.core.defchararray.endswith(scn_files, ".scn")]
-#
-#     # If the string length is larger than 1, this corresponds to an acid and therefore load
-#     # only the file corresponding to it.
-#     else:
-#         # Add scn file extension
-#         scn_files = np.array([".".join([var, "scn"])])
-#
-#     # Vectorized version of the function batch.findFile
-#     vfindFile = np.vectorize(findFile)
-#
-#     # Scenario files.
-#     scn_paths = np.ones(scn_files.shape, dtype="U32")
-#     scn_paths[:] = scenario_path
-#
-#     ic = vfindFile(scn_files, scn_paths)
-#
-#     if ic[0] is None:
-#         return None
-#
-#     else:
-#         # Remove the "scenario/" from path.
-#         ic = np.core.defchararray.lstrip(ic, "scenario/")
-#         return ic,scn_files,vfindFile
-#
-# def init_wind_files(var):
-#     # Wind files.
-#     # scenario file names without extension
-#     if var is None:
-#         return var
-#
-#     elif len(var) == 3:
-#         # scenario file names without extension
-#         name_files = np.core.defchararray.rstrip(var[1], '.scn')
-#
-#         wind_path = os.path.join(settings.data_path, "netcdf")
-#
-#         wind_extension = np.ones(name_files.shape, dtype="U3")
-#         wind_extension[:] = 'nc'
-#
-#         wind_paths = np.ones(name_files.shape, dtype="U11")
-#         wind_paths[:] = wind_path
-#
-#         nc = var[2](name_files, wind_paths, wind_extension)
-#         # Index of wind files that are available for simulation
-#         idx_wfiles = np.where(nc != "None")
-#
-#         # Remove scenario files where there is no wind available for simulation
-#         ic = var[0][idx_wfiles]
-#         name_files = name_files[idx_wfiles]
-#
-#         return ic,nc,name_files
-#
-# def findFile(seekName, path, extension=None):
-#
-#     if extension:
-#         seekName = ".".join([seekName, extension])
-#
-#     if os.path.isfile(os.path.join(path, seekName)):
-#         return os.path.join(path, seekName)
-#     else:
-#         return None
-
 class Batch(TrafficArrays):
 
     def __init__(self):
@@ -145,42 +71,84 @@ class Batch(TrafficArrays):
 
         self.ic = []
         self.nc = []
-        # self.running = False
+
         self.current_scn     = 0
+        self.current_nc      = 0
         self.current_member  = 1
 
         # Parameters of the datalogger
         self.active = False
         self.dt     = 1.0    # [s] frequency of area check (simtime)
+        self.logType = None
+
+        with RegisterElementParameters(self):
+            self.last_wpt_in_route = np.array([])
+            self.actwp_in_route_update = np.array([])
 
     def update(self):
+
         #When all aircraft get deleted.
         if not self.active:
             pass
 
         else:
-            if not sim.ffmode:
-                stack.stack("FF")
+
+            if self.logType == "WINDLOG":
+                # Determine the last wpt number
+                self.actwp_in_route_update[-1:] = [traf.ap.route[idx].iactwp for idx, st in enumerate(traf.id)]
+                self.last_wpt_in_route[-1:] = [len(traf.ap.route[idx].wplat) - 1 for idx, st in enumerate(traf.id)]
+
+                acwpt_dest = np.equal(self.last_wpt_in_route, self.actwp_in_route_update)
+                acwpt_dest_idx = np.where(acwpt_dest)[0]
+
+                # Log flight statistics when for aircraft that switches waypoint
+                if len(acwpt_dest_idx) > 0:
+
+                    at_dest = np.isclose(traf.lat, traf.actwp.lat, rtol=0.0001) & \
+                              np.isclose(traf.lon, traf.actwp.lon, rtol=0.0001)
+                    at_dest_idx = np.where(at_dest)[0]
+
+                    if len(at_dest_idx) > 0:
+                        # delete all aicraft in self.delidx
+                        traf.delete(at_dest_idx)
 
             if len(traf.id) == 0:
                 stack.stack("HOLD")
+
                 self.current_member += 1
 
                 if self.current_member <= traf.wind.realisations.size:
+
                     stack.stack('ensemble_member {}'.format(self.current_member))
                     stack.stack('IC {}'.format(self.ic[self.current_scn]))
+
                 else:
-                    stack.stack("WPTLOG OFF")
-                    self.current_scn += 1
-                    if self.current_scn < len(self.ic):
-                        stack.stack('load_wind {}'.format(self.nc[self.current_scn]))
-                        self.current_member = 1 # Restart the
+                    # Restart the member count
+                    self.current_member = 1
+                    # Increase the current wind file counter
+                    self.current_nc += 1
+
+                    # Check if there are other wind files to consider
+                    if self.current_nc < len(self.nc[self.current_scn]):
+                        stack.stack('load_wind {}'.format(self.nc[self.current_scn][self.current_nc]))
                         stack.stack('ensemble_member {}'.format(self.current_member))
                         stack.stack('IC {}'.format(self.ic[self.current_scn]))
+
                     else:
-                        stack.stack('QUIT')
+                        # Restart the file counter
+                        self.current_nc = 0
+                        self.current_scn += 1
+
+                        if self.current_scn < len(self.ic):
+                            stack.stack('load_wind {}'.format(self.nc[self.current_scn][self.current_nc]))
+                            stack.stack('ensemble_member {}'.format(self.current_member))
+                            stack.stack('IC {}'.format(self.ic[self.current_scn]))
+                        else:
+                            move_output()
+                            stack.stack('QUIT')
 
     def preupdate(self):
+
         pass
 
     def reset(self):
@@ -197,55 +165,50 @@ class Batch(TrafficArrays):
         if len(args)  == 2:
 
             scenarioFilePath = args[0].lower()
-            ncFilePath     = args[1].lower()
-
-            # Check if the two strings provided have a file extension,
-            # otherwise they are directories
             scnExtension = os.path.splitext(scenarioFilePath)[1]
-            ncExtension  = os.path.splitext(ncFilePath)[1]
 
-
+            self.logType = args[1]
             # the string provided is a directory and therefore all files
             # in the directory are analysed.
 
             if len(scnExtension) == 0:
-                for root, dir, files in os.walk(scenarioFilePath):
-                    for f in files:
-                        if f.endswith('.scn'):
-                            self.ic.append(os.path.join(settings.scenario_path,
-                                                        datetime.datetime.now().strftime("%d-%m-%Y"),
-                                                        f))
+
+                twTypeFolder = os.path.join(datetime.datetime.now().strftime("%d-%m-%Y"),
+                                            scenarioFilePath)
+
+                for root, dir, files in os.walk(twTypeFolder):
+                    self.ic = [os.path.join(twTypeFolder,f) for f in files if f.endswith('.scn')]
+
+
             else:
-                self.ic.append(os.path.join(settings.scenario_path,
-                                            datetime.datetime.now().strftime("%d-%m-%Y"),
+                self.ic.append(os.path.join(datetime.datetime.now().strftime("%d-%m-%Y"),
                                             scenarioFilePath))
 
-            if len(ncExtension) == 0:
-                for root, dir, files in os.walk(scenarioFilePath):
-                    for f in files:
-                        if f.endswith('.scn'):
-                            self.nc.append(os.path.join(settings.data_path,"netcdf",f))
-            else:
-                self.nc.append(os.path.join(settings.data_path,"netcdf",
-                                            datetime.datetime.now().strftime("%d-%m-%Y"),
-                                            ncFilePath))
+            for scn in self.ic:
 
-                # Load the appropriate wind file into memory
-            stack.stack('load_wind {}'.format(self.nc[self.current_scn]))
+                date,time = os.path.splitext(scn)[0].split("/")[-1].split("_")[-2],\
+                            os.path.splitext(scn)[0].split("/")[-1].split("_")[-1]
+                self.nc.append(glob.glob(os.path.join(settings.data_path,'netcdf') +
+                                   '/ecmwf_pl_{}_{}_*.nc'.format(date,time), recursive=True))
+
+            # Load the appropriate wind file into memory
+            stack.stack('load_wind {}'.format(self.nc[self.current_scn][self.current_nc]))
             stack.stack('ensemble_member {}'.format(self.current_member))
             stack.stack('IC {}'.format(self.ic[self.current_scn]))
 
             if len(self.ic) != 0:
                 self.active = True
 
-                return True, "SIMBATCH files available to simulate"
+
+
+                return True, "BATCHSIM files available to simulate"
 
             else:
 
-                return False, "SIMBATCH does not have any files loaded into memory"
+                return False, "BATCHSIM does not have any files loaded into memory"
         else:
 
-            return False,"Incorrect number of arguments" + '\nBATCHSIM scenarioFilePath windFilePath '
+            return False,"Incorrect number of arguments" + '\nBATCHSIM scenario,logType'
 
 
 

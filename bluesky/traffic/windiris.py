@@ -10,6 +10,7 @@ import numpy as np
 import iris
 from bluesky.tools.aero import vatmos, kts
 import bluesky as bs
+import os
 
 class WindIris:
     """
@@ -44,6 +45,7 @@ class WindIris:
 
         self.winddim = 3
         self.filename = None
+        self.hours_before_departure = None # handy to have when logging because filename is too long
 
         self.cubes       = []
         self.grid_lat    = [] # [deg]
@@ -73,6 +75,7 @@ class WindIris:
         if self.filename != filename or self.filename is None:
 
             self.filename = filename
+            self.hours_before_departure = int(os.path.splitext(filename)[0].split("_")[-1].split("-")[0])
 
             self.cubes = iris.load(self.filename.lower(), ['northward_wind', 'eastward_wind'])
 

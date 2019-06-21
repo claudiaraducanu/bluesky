@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import datetime
-from utils.datTools import ddrToScn, grib2wind
+from adapt.scenarioGeneration import ddrToScn, grib2wind
 
 if __name__ == "__main__":
 
@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
                 print("_______________________________________________________________")
                 print("Trajectory ", os.path.splitext(f)[0], "...")
-                scenario = ddrToScn.FlightPlan(filePath,cruise=True)
+                scenario = ddrToScn.FlightPlan(filePath, cruise=True)
 
                 # dates from which to retrieve wind parameter strftime("%Y-%m-%d")
                 dateDeparture  = scenario.date_start.date()
@@ -103,4 +103,4 @@ if __name__ == "__main__":
                         grib2wind.tigge_pf_pl_request(dateAnalysis, timeAnalysis, stepsAnalysis, grbTargetAnalysis)
 
                     ncTargetAnalysis = os.path.join(ncDirPath,target)
-                    grib2wind.grib2netcdf(ncTargetAnalysis,grbTargetAnalysis)
+                    grib2wind.grib2netcdf(ncTargetAnalysis, grbTargetAnalysis)

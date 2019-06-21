@@ -1,4 +1,3 @@
-
 In order to download weather data from the ECMWF, the MARS interface is used. A
 complete description of the MARS interface can be found here 
 [https://confluence.ecmwf.int/display/WEBAPI/Access+MARS]. Alternatively the web

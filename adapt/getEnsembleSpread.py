@@ -209,38 +209,3 @@ class WindIris:
         east = ndimage.map_coordinates(self.east, coord, order=1, mode='wrap')
 
         return north, east
-
-    # -----  mimic WindSim class API -------------------
-    def get(self, lat, lon, alt=0):
-        """
-        Get wind vector at given position (and optionally altitude)
-        :param lat:
-        :param lon:
-        :param alt:
-        :return:
-        """
-
-        vn, ve = self.getdata(lat, lon, alt)
-
-        wdir = (np.degrees(np.arctan2(ve, vn)) + 180) % 360
-        wspd = np.sqrt(vn * vn + ve * ve)
-
-        txt = "WIND AT %.5f, %.5f: %03d/%d" % (lat, lon, np.round(wdir), np.round(wspd / kts))
-
-        return True, txt
-
-    def addpoint(self, lat, lon, winddir, windspd, windalt=None):
-        # not used
-        pass
-
-    def remove(self, idx):
-        # not used
-        pass
-
-    def add(self, *arg):
-        # not used
-        pass
-
-    def clear(self):
-        # not used
-        pass

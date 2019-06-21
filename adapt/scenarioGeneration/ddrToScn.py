@@ -131,10 +131,10 @@ class FlightPlan():
         :return: string of VNAV,LNAV,op,ff stack commands
         """
 
-        return "0:00:00.00>lnav {} ON \n0:00:00.00>vnav {} ON \n00:00:00.00>op \n00:00:00.05>ff\n".\
+        return "0:00:00.00>lnav {} ON \n0:00:00.00>vnav {} ON \n00:00:00.00>op \n00:00:01.00>ff\n".\
             format(self.acid, self.acid)
 
-    def start_log(self,log_type,period=1.0,variables='id,lat,lon,alt,gs,cas,traf.perf.mass,traf.'):
+    def start_log(self,log_type):
         """
 
         :param log_type: select way in which to log information and give appropriate stack command
@@ -142,13 +142,15 @@ class FlightPlan():
         :param varaibles: string of variables to log data
         :return:
         """
-        if  log_type == 'periodic':
 
-            return  "0:00:00.00>crelog STANDARD {} \n".format(period) + \
-                    "0:00:00.00>STANDARD ADD {}\n".format(variables) + \
-                    "0:00:00.00>STANDARD ON\n"
+        if log_type == "windlog":
 
-        elif log_type == 'waypoint':
+            return "0:00:00.00>CRELOG WINDLOG 1.0\n"  \
+                   "0:00:00.00>WINDLOG ADD traf.id,traf.wind.current_ensemble,traf.wind.hours_before_departure," \
+                   "traf.gsnorth,traf.gseast,traf.gs,traf.tas,traf.cas,traf.trk,traf.hdg\n"  \
+                "0:00:00.00>WINDLOG ON\n"
+
+        elif log_type == 'wptlog':
 
             return  "0:00:00.00>WPTLOG ON\n"
 
