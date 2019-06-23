@@ -416,13 +416,13 @@ class Afms:
                 wpidx = traf.ap.route[idx].wpname.index(name)
                 if mode in self._fms_modes:
                     if mode == self._fms_modes[0]:
-                        traf.ap.route[idx].wpfms_mode[wpidx] = 0
+                        traf.ap.route[idx].wpfms_mode[wpidx] = 0 # OFF
                     elif mode == self._fms_modes[2]:
-                        traf.ap.route[idx].wpfms_mode[wpidx] = 2
+                        traf.ap.route[idx].wpfms_mode[wpidx] = 2 # OWN
                     elif mode == self._fms_modes[3]:
-                        traf.ap.route[idx].wpfms_mode[wpidx] = 3
+                        traf.ap.route[idx].wpfms_mode[wpidx] = 3 # RTA
                     elif mode == self._fms_modes[4]:
-                        traf.ap.route[idx].wpfms_mode[wpidx] = 4
+                        traf.ap.route[idx].wpfms_mode[wpidx] = 4 # RTA
                     else:
                         traf.ap.route[idx].wpfms_mode[wpidx] = 1  # CONTINUE
                 else:
@@ -493,8 +493,8 @@ class Afms:
         :param time2: RTA in time format
         :return: time in seconds
         """
-        time1 = sim.utc.time()
-        time_format = '%H:%M:%S'
+        time1 = sim.utc.time() # current UTC simulation time
+        time_format = '%H:%M:%S' 
         tdelta = datetime.strptime(time2.strftime(time_format), time_format) -\
                  datetime.strptime(time1.strftime(time_format), time_format)
         if tdelta.days < 0:

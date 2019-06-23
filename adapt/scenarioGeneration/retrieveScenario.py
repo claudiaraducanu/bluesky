@@ -45,7 +45,7 @@ if __name__ == "__main__":
                 # into the trajectories object as a data frame.
                 fpath = os.path.join(ddrDirName, name)
                 print("Loading trajectory of flight ", os.path.splitext(name)[0], "...")
-                scenario = ddrToScn.FlightPlan(fpath, cruise=True)
+                scenario = ddrToScn.parseDDR(fpath, cruise=True)
 
                 # TODO : make more flexible
                 rtaWpts      = [1,14,scenario.data.index.max()]

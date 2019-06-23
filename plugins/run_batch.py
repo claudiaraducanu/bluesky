@@ -4,7 +4,6 @@ import os
 import datetime
 import glob
 import numpy as np
-from adapt.move_output import move_output
 
 # Initialization function of your plugin. Do not change the name of this
 # function, as it is the way BlueSky recognises this file as a plugin.
@@ -144,7 +143,6 @@ class Batch(TrafficArrays):
                             stack.stack('ensemble_member {}'.format(self.current_member))
                             stack.stack('IC {}'.format(self.ic[self.current_scn]))
                         else:
-                            move_output()
                             stack.stack('QUIT')
 
     def preupdate(self):

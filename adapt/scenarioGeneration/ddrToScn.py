@@ -9,7 +9,7 @@ import pandas as pd
 from bluesky.tools import aero, geo
 import numpy as np
 
-class FlightPlan():
+class parseDDR():
 
 
     def __init__(self,fpath,cruise=False):
