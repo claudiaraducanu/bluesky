@@ -1,8 +1,8 @@
 """ BlueSky plugin template. The text you put here will be visible
     in BlueSky as the description of your plugin. """
 # Import the global bluesky objects. Uncomment the ones you need
-from bluesky import stack,scr,traf,sim  #, settings, navdb, traf, sim, scr, windtools
-from bluesky.tools import datalog, areafilter, geo, \
+from bluesky import stack,scr,traf,sim,settings  #, settings, navdb, traf, sim, scr, windtools
+from bluesky.tools import datalog, geo, aero, \
     TrafficArrays, RegisterElementParameters
 import numpy as np
 
@@ -91,21 +91,18 @@ class logWpt(TrafficArrays):
         super(logWpt, self).__init__()
         # Parameters of area
         self.active = False
-        self.dt     = 1.0    # [s] frequency of area check (simtime)
-        self.file   = None
+        self.dt     = settings.fms_dt   # [s] frequency of area check (simtime)
 
         # The WPTLOG logger
         self.logger = datalog.crelog('WPTLOG', None, header)
 
         with RegisterElementParameters(self):
-            self.last_wpt_in_route        = np.array([])
-            self.actwp_in_route_preupdate        = np.array([])
-            self.actwp_in_route_update           = np.array([])
-            self.initial_mass = np.array([])
+            self.initial_mass                    = np.array([])
 
     def create(self, n=1):
         super(logWpt, self).create(n)
         self.initial_mass[-n:] = traf.perf.mass
+
 
     def log_data(self,idx):
 
@@ -122,52 +119,30 @@ class logWpt(TrafficArrays):
             traf.cas[idx],
             traf.gs[idx],
             self.initial_mass[idx] - traf.perf.mass[idx],
-            traf.perf.mass[idx],
-        )
+            traf.perf.mass[idx])
 
     def update(self):
-
         if not self.active:
             pass
         else:
 
-            self.actwp_in_route_update[-1:] = [traf.ap.route[idx].iactwp for idx, st in enumerate(traf.id)]
-            switch_wpt     = np.equal(self.actwp_in_route_preupdate,self.actwp_in_route_update)
-            switch_wpt_idx = np.where(switch_wpt == False)[0]
+            qdr, distinnm = geo.qdrdist(traf.lat, traf.lon,
+                                        traf.actwp.lat, traf.actwp.lon)  # [deg][nm])
+            dist = distinnm * aero.nm  # Conversion to meters
 
-            # Log flight statistics when for aircraft that switches waypoint
-            if len(switch_wpt_idx) > 0:
+            # aircraft for which way-point will get shifted way-points for aircraft i where necessary
+            if len(traf.actwp.Reached(qdr, dist, traf.actwp.flyby)):
 
-                self.log_data(switch_wpt_idx)
-                # delete all aicraft in self.delidx
+                # log flight statistics when for aircraft that switches waypoint
+                self.log_data(traf.actwp.Reached(qdr, dist, traf.actwp.flyby))
 
-            # Determine the last wpt number
-            self.last_wpt_in_route[-1:] = [len(traf.ap.route[idx].wplat)-1 for idx, st in enumerate(traf.id)]
-
-            acwpt_dest         = np.equal(self.last_wpt_in_route,self.actwp_in_route_update)
-            acwpt_dest_idx     = np.where(acwpt_dest)[0]
-
-
-            #Log flight statistics when for aircraft that switches waypoint
-            if len(acwpt_dest_idx) > 0:
-
-                at_dest = np.isclose(traf.lat, traf.actwp.lat, rtol=0.0001) & \
-                                np.isclose(traf.lon, traf.actwp.lon, rtol=0.0001)
-                at_dest_idx = np.where(at_dest)[0]
-
-                if len(at_dest_idx) > 0:
-
-                    self.log_data(at_dest_idx)
-
-                    # delete all aicraft in self.delidx
-                    traf.delete(at_dest_idx)
+                for idx in traf.actwp.Reached(qdr, dist, traf.actwp.flyby):
+                    if traf.ap.route[idx].iactwp == traf.ap.route[idx].nwp - 1:
+                        # delete all aicraft in self.delidx
+                        traf.delete(idx)
 
     def preupdate(self):
-
-        if not self.active:
-            pass
-        else:
-            self.actwp_in_route_preupdate[-1:] = [traf.ap.route[idx].iactwp for idx, st in enumerate(traf.id)]
+        pass
 
     def reset(self):
         pass
@@ -185,7 +160,6 @@ class logWpt(TrafficArrays):
             if args[0]:
 
                 self.logger.start()
-
                 # Log the initial state of all the aircraft in the simulation
                 traffic_id = [idx for idx, st in enumerate(traf.id)]
                 self.log_data(traffic_id)
