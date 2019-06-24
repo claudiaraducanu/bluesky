@@ -175,7 +175,7 @@ class parseDDR():
 
         all_defwpt = []
 
-        for idx in range(1, self.data.index.size):
+        for idx in range(0, self.data.index.size):
 
             defwpt = '0:00:00.00>defwpt ' + 'wpt_{}'.format(idx) + ' ' + \
                      str(self.data.iloc[idx].x_coord) + ' ' + \
@@ -193,7 +193,7 @@ class parseDDR():
 
         all_after = []
 
-        for idx in range(1, self.data.index.size):
+        for idx in range(0, self.data.index.size):
 
             if with_spd:
                 spd, hdg = self._avg_spd(self.data.iloc[idx-1], self.data.iloc[idx])
