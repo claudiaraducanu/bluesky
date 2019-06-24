@@ -1,5 +1,6 @@
 from bluesky import settings,stack, traf, sim
-from bluesky.tools import datalog,TrafficArrays,RegisterElementParameters
+from bluesky.tools import TrafficArrays,RegisterElementParameters,\
+                        aero,geo
 import os
 import datetime
 import glob
@@ -80,10 +81,6 @@ class Batch(TrafficArrays):
         self.dt     = 1.0    # [s] frequency of area check (simtime)
         self.logType = None
 
-        with RegisterElementParameters(self):
-            self.last_wpt_in_route = np.array([])
-            self.actwp_in_route_update = np.array([])
-
     def update(self):
 
         #When all aircraft get deleted.
@@ -93,23 +90,19 @@ class Batch(TrafficArrays):
         else:
 
             if self.logType == "WINDLOG":
-                # Determine the last wpt number
-                self.actwp_in_route_update[-1:] = [traf.ap.route[idx].iactwp for idx, st in enumerate(traf.id)]
-                self.last_wpt_in_route[-1:] = [len(traf.ap.route[idx].wplat) - 1 for idx, st in enumerate(traf.id)]
 
-                acwpt_dest = np.equal(self.last_wpt_in_route, self.actwp_in_route_update)
-                acwpt_dest_idx = np.where(acwpt_dest)[0]
+                qdr, distinnm = geo.qdrdist(traf.lat, traf.lon,
+                                            traf.actwp.lat, traf.actwp.lon)  # [deg][nm])
+                dist = distinnm * aero.nm  # Conversion to meters
 
-                # Log flight statistics when for aircraft that switches waypoint
-                if len(acwpt_dest_idx) > 0:
+                # aircraft for which way-point will get shifted way-points for aircraft i where necessary
+                if len(traf.actwp.Reached(qdr, dist, traf.actwp.flyby)):
 
-                    at_dest = np.isclose(traf.lat, traf.actwp.lat, rtol=0.0001) & \
-                              np.isclose(traf.lon, traf.actwp.lon, rtol=0.0001)
-                    at_dest_idx = np.where(at_dest)[0]
-
-                    if len(at_dest_idx) > 0:
-                        # delete all aicraft in self.delidx
-                        traf.delete(at_dest_idx)
+                    # log flight statistics when for aircraft that switches waypoint
+                    for idx in traf.actwp.Reached(qdr, dist, traf.actwp.flyby):
+                        if traf.ap.route[idx].iactwp == traf.ap.route[idx].nwp - 1:
+                            # delete all aicraft in self.delidx
+                            traf.delete(idx)
 
             if len(traf.id) == 0:
                 stack.stack("HOLD")
@@ -196,8 +189,6 @@ class Batch(TrafficArrays):
 
             if len(self.ic) != 0:
                 self.active = True
-
-
 
                 return True, "BATCHSIM files available to simulate"
 
