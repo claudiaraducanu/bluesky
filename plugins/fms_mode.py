@@ -137,7 +137,7 @@ class Afms:
     def __init__(self):
         super(Afms, self).__init__()
         # Parameters of afms
-        self.dt = 60.0  # [s] frequency of afms update (simtime)
+        self.dt = 180.0  # [s] frequency of afms update (simtime)
         self.skip2next_rta_time_s = 300.0  # Time when skipping to the RTA beyond the active RTA
         self.rta_standard_window_size = 60.  # [s] standard time window size for rta in seconds
         self._patch_route(self.rta_standard_window_size)
