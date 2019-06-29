@@ -1,9 +1,9 @@
 output
 scenario/ic.scn
 data/cache
-data/grib
-data/netcdf
-data/ddr
+adapt/input/grib/*
+adapt/input/netcdf/*
+adapt/input/ddr/*
 data/performance/BADA/*
 !/data/performance/BADA/README.md
 
@@ -18,6 +18,7 @@ target/
 
 .DS_Store
 settings.cfg
+adapt/adaptsettings.cfg
 *.bak
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -77,6 +78,7 @@ coverage.xml
 
 # Django stuff:
 *.log
+
 
 # Sphinx documentation
 docs/_build/
