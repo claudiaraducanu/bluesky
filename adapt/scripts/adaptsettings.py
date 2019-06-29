@@ -8,6 +8,7 @@ def init(cfgfile=''):
        create an initial config file'''
 
     rundir = ''
+    bluskydir = os.path.dirname(os.path.dirname(os.path.dirname( __file__ )))
 
     if not cfgfile:
         cfgfile = os.path.join(rundir, 'adaptsettings.cfg')
@@ -29,9 +30,12 @@ def init(cfgfile=''):
         config.set('path', 'netcdf_path', os.path.join(rundir, 'input/netcdf'))
         config.set('path', 'grib_path', os.path.join(rundir, 'input/grib'))
         config.set('path', 'output_path', 'output')
-        config.set('path', 'bluesky_path',  os.path.dirname(os.path.dirname(os.path.dirname( __file__ ))))
-        config.set('path', 'scn_path',  os.path.join(os.path.dirname(
-            os.path.dirname(os.path.dirname( __file__ ))),'scenario'))
+        config.set('path', 'bluesky_path', bluskydir)
+        config.set('path', 'scn_path',  os.path.join(bluskydir,'scenario'))
+
+        # afms mode settings
+        config.add_section('afms')
+        config.set('afms', 'wp_frequency','300')
 
         # Writing our configuration file to 'example.cfg'
         with open(cfgfile, 'w') as configfile:
@@ -48,7 +52,7 @@ def init(cfgfile=''):
 
     #TODO create the directories if they do not exit
 
-    return config[config.sections()[0]]
+    return config
 
 
 
