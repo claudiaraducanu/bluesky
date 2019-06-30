@@ -46,13 +46,26 @@ def init_plugin():
         # The command name for your function
         'BATCHSIM': [
             # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
-            'BATCHSIM scenario,logType',
+            'BATCHSIM scenario, wind_from',
 
             # A list of the argument types your function accepts. For a description of this, see ...
-            'txt,txt',
+            'txt,int',
 
             # The name of your function in this plugin
             batch.set_batchsim,
+
+            # a longer help text of your function.
+            'Print something to the bluesky console based on the flag passed to MYFUN.'],
+
+        'BATCHSTART': [
+            # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
+            'BATCHSTART [logtype]',
+
+            # A list of the argument types your function accepts. For a description of this, see ...
+            '[txt]',
+
+            # The name of your function in this plugin
+            batch.start,
 
             # a longer help text of your function.
             'Print something to the bluesky console based on the flag passed to MYFUN.'],
@@ -79,7 +92,7 @@ class Batch(TrafficArrays):
         # Parameters of the datalogger
         self.active = False
         self.dt     = 1.0    # [s] frequency of area check (simtime)
-        self.logType = None
+        self.logType = "WPTLOG"
 
     def update(self):
 
@@ -155,49 +168,43 @@ class Batch(TrafficArrays):
         # Two arguments are required,
         if len(args)  == 2:
 
-            scenarioFilePath = args[0].lower()
-            scnExtension = os.path.splitext(scenarioFilePath)[1]
-
-            self.logType = args[1]
+            scenarioFile   = args[0] # relative to the scenario
             # the string provided is a directory and therefore all files
             # in the directory are analysed.
+            scenarioFilePath = scenarioFile
 
-            if len(scnExtension) == 0:
+            date, time, end = os.path.splitext(scenarioFile)[0].split("_")[-3], \
+                                os.path.splitext(scenarioFile)[0].split("_")[-2], \
+                                os.path.splitext(scenarioFile)[0].split("_")[-1]
 
-                twTypeFolder = os.path.join(datetime.datetime.now().strftime("%d-%m-%Y"),
-                                            scenarioFilePath)
+            netcdfFilePath = glob.glob("adapt/input/netcdf" + '/ecmwf_pl_{}_{}*{}.nc'.
+                                       format(date,time,args[1]*24+int(end)), recursive=True)
 
-                for root, dir, files in os.walk(twTypeFolder):
-                    self.ic = [os.path.join(twTypeFolder,f) for f in files if f.endswith('.scn')]
+            self.ic.append(scenarioFilePath)
+            self.nc.append(netcdfFilePath)
 
-
-            else:
-                self.ic.append(os.path.join(datetime.datetime.now().strftime("%d-%m-%Y"),
-                                            scenarioFilePath))
-
-            for scn in self.ic:
-
-                date,time = os.path.splitext(scn)[0].split("/")[-1].split("_")[-2],\
-                            os.path.splitext(scn)[0].split("/")[-1].split("_")[-1]
-                self.nc.append(glob.glob(os.path.join(settings.data_path,'netcdf') +
-                                   '/ecmwf_pl_{}_{}_*.nc'.format(date,time), recursive=True))
-
-            # Load the appropriate wind file into memory
-            stack.stack('load_wind {}'.format(self.nc[self.current_scn][self.current_nc]))
-            stack.stack('ensemble_member {}'.format(self.current_member))
-            stack.stack('IC {}'.format(self.ic[self.current_scn]))
-
-            if len(self.ic) != 0:
-                self.active = True
-
-                return True, "BATCHSIM files available to simulate"
-
-            else:
-
-                return False, "BATCHSIM does not have any files loaded into memory"
         else:
 
             return False,"Incorrect number of arguments" + '\nBATCHSIM scenario,logType'
 
+    def start(self,*args):
+
+        # Load the first wind and scenario file into memory
+        stack.stack('load_wind {}'.format(self.nc[self.current_scn][self.current_nc]))
+        stack.stack('ensemble_member {}'.format(self.current_member))
+        stack.stack('IC {}'.format(self.ic[self.current_scn]))
+
+        if len(args) == 1:
+            self.logType = args[0]
+        elif not len(args):
+            pass
+        else:
+            return False, "Incorrect number of arguments"
+
+        if len(self.ic) != 0:
+            self.active = True
+            return True, "BATCHSIM files available to simulate"
+        else:
+            return False,"BATCHSIM does not have any files loaded into memory"
 
 

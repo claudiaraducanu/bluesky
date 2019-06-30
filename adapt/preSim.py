@@ -84,7 +84,7 @@ if __name__ == "__main__":
                 scenario.tw_probabilistic   = trajectory_list.loc[scenario.acid]["probabilistic"]['TW']
 
                 """Retrieve wind"""
-                timeAnalysis = grib2wind.downloadWind(scenario,daysBeforeDeparture,
+                timeAnalysis,stepEnd = grib2wind.downloadWind(scenario,daysBeforeDeparture,
                                           hoursBeforeDeparture,paths["grib_path"],paths["netcdf_path"])
 
                 twWidths = { '01': 1,
@@ -111,7 +111,7 @@ if __name__ == "__main__":
                     scnfilename = ".".join(["_".join([key,
                                                      scenario.acid,
                                                      scenario.date_start.strftime("%Y%m%d"),
-                                                     timeAnalysis]),
+                                                     timeAnalysis,str(stepEnd)]),
                                                      'scn'])
 
                     print("              ","scnfile >>> {} ".format(scnfilename))

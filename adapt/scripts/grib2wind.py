@@ -73,7 +73,7 @@ def downloadWind(scenario,daysBeforeDeparture,hoursBeforeDeparture,grbDirPath,nc
         dateAnalysis = datesBeforeDeparture[idx].strftime("%Y-%m-%d")
         stepsAnalysis  = "/".join(forecastSteps[idx].astype(str).tolist())
 
-        target = 'ecmwf_pl_%s_%s_%s.grb' % (dateDeparture.strftime("%Y-%m-%d"), timeAnalysis,
+        target = 'ecmwf_pl_%s_%s_%s.grb' % (dateDeparture.strftime("%Y%m%d"), timeAnalysis,
                                             "-".join(forecastSteps[idx].astype(str).tolist()))
         grbTargetAnalysis = os.path.join(grbDirPath,target)
 
@@ -85,4 +85,4 @@ def downloadWind(scenario,daysBeforeDeparture,hoursBeforeDeparture,grbDirPath,nc
         if not os.path.isfile(ncTargetAnalysis):
             grib2netcdf(ncTargetAnalysis, grbTargetAnalysis)
 
-    return timeAnalysis
+    return timeAnalysis,stepEnd
