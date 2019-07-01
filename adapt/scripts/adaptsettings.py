@@ -30,6 +30,7 @@ def init(cfgfile=''):
         config.set('path', 'netcdf_path', os.path.join(rundir, 'input/netcdf'))
         config.set('path', 'grib_path', os.path.join(rundir, 'input/grib'))
         config.set('path', 'output_path', 'output')
+        config.set('path', 'xlsx_path', 'output/xlsxFiles')
         config.set('path', 'bluesky_path', bluskydir)
         config.set('path', 'scn_path',  os.path.join(bluskydir,'scenario'))
 

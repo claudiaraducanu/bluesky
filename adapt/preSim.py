@@ -85,7 +85,7 @@ if __name__ == "__main__":
 
                 """Retrieve wind"""
                 timeAnalysis,stepEnd = grib2wind.downloadWind(scenario,daysBeforeDeparture,
-                                          hoursBeforeDeparture,paths["grib_path"],paths["netcdf_path"])
+                                           hoursBeforeDeparture,paths["grib_path"],paths["netcdf_path"])
 
                 twWidths = { '01': 1,
                              '60': 60,
@@ -106,7 +106,11 @@ if __name__ == "__main__":
 
                     rtaWpts.append(idx)
 
+
                 for key in twWidths:
+
+                    if key == "60":
+                        rtaWpts = [0,scenario.data.index[-1]]
 
                     scnfilename = ".".join(["_".join([key,
                                                      scenario.acid,

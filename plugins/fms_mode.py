@@ -247,6 +247,8 @@ class Afms:
                                                        traf.ap.route[idx].wpalt[rta_init_index + 1:rta_last_index + 1]))
                         # rta_cas_kts = self._rta_cas_wfl(distances_nm, flightlevels_m, time_s2rta, traf.cas[idx]) * 3600 / 1852
                         rta_cas_m_s = self._cas2rta(distances_nm, flightlevels_m, time_s2rta, traf.cas[idx])
+
+
                         if abs(traf.cas[idx] - rta_cas_m_s) > 0.5:  # Don't give very small speed changes
                             if abs(traf.vs[idx]) < 2.5:  # Don't give a speed change when changing altitude
                                 if tools.aero.vcas2mach(rta_cas_m_s, flightlevels_m[0]) > 0.95:
