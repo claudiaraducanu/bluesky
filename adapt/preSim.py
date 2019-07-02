@@ -95,13 +95,14 @@ if __name__ == "__main__":
 
                 twWidths = { '01': 1, '60': 60, 'deterministic':  int(scenario.tw_deterministic)}
 
-                if twWidths["deterministic"] == int(scenario.tw_probabilistic):
+                if twWidths["deterministic"] != int(scenario.tw_probabilistic):
                      twWidths['probabilistic'] = int(scenario.tw_probabilistic)
 
                 for key in twWidths:
 
                     if key == "60":
                         rtaWpts = [0,scenario.data.index[-1]]
+
                     else:
 
                         # define the way-points that have an RTA constraint. Start out with the first way-point
