@@ -17,13 +17,15 @@ header = \
     "Flight Time [s], " + \
     "Call sign [-], " + \
     "Ensemble Member [-], " + \
+    "Forecast time [-], " + \
     "Latitude [deg], " + \
     "Longitude [deg], " + \
     "Altitude [m], " + \
     "TAS [m/s], " + \
-    "CAS [m/s] " + \
-    "GS  [m/s] " + \
-    "Mass [kg] "
+    "CAS [m/s], " + \
+    "GS  [m/s], " + \
+    "Fuel Mass [kg], " + \
+    "Mass [kg], "
 
 ### Initialization function of your plugin. Do not change the name of this
 ### function, as it is the way BlueSky recognises this file as a plugin.
@@ -108,9 +110,8 @@ class logWpt(TrafficArrays):
 
         self.logger.log(
             np.array(traf.id)[idx],
-            traf.wind.filename,
             traf.wind.current_ensemble,
-            traf.wind.filename,
+            traf.wind.filename.split("/")[-1],
             np.array(traf.type)[idx],
             traf.lat[idx],
             traf.lon[idx],
@@ -125,7 +126,6 @@ class logWpt(TrafficArrays):
         if not self.active:
             pass
         else:
-
             qdr, distinnm = geo.qdrdist(traf.lat, traf.lon,
                                         traf.actwp.lat, traf.actwp.lon)  # [deg][nm])
             dist = distinnm * aero.nm  # Conversion to meters

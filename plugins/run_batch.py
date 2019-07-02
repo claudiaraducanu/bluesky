@@ -173,7 +173,7 @@ class Batch(TrafficArrays):
             # in the directory are analysed.
             scenarioFilePath = scenarioFile
 
-            date, time, end = os.path.splitext(scenarioFile)[0].split("_")[-3], \
+            date, time, end =   os.path.splitext(scenarioFile)[0].split("_")[-3], \
                                 os.path.splitext(scenarioFile)[0].split("_")[-2], \
                                 os.path.splitext(scenarioFile)[0].split("_")[-1]
 
