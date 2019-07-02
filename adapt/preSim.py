@@ -62,6 +62,7 @@ if __name__ == "__main__":
             logType = 'wptlog'
 
     currentScndir = os.path.join(paths["scn_path"],logType.upper(),datetime.datetime.now().strftime("%Y%m%d"))
+
     if not os.path.isdir(currentScndir):
         print()
         print('No {} directory in {} found'.format(logType.upper() + "/" +datetime.datetime.now().strftime("Y%m%d"),
@@ -70,7 +71,8 @@ if __name__ == "__main__":
         print('A default version will be generated,please do not change')
         print()
 
-    """ Loop through the DDR trajectories"""
+    """ Loop through the DDR trajectories to create scn files"""
+
     for root,dirs,files in os.walk(paths["ddr_path"]):
 
         for file in files:
@@ -87,30 +89,47 @@ if __name__ == "__main__":
                 timeAnalysis,stepEnd = grib2wind.downloadWind(scenario,daysBeforeDeparture,
                                            hoursBeforeDeparture,paths["grib_path"],paths["netcdf_path"])
 
-                twWidths = { '01': 1,
-                             '60': 60,
-                             'deterministic':  int(scenario.tw_deterministic),
-                             'probabilistic':  int(scenario.tw_probabilistic)}
+                # set the number of scenario files to create depending on the type of time windows to be analysed,
+                # where the default is 4 consisting of 1min,60min the probabilistic and the deterministic. If the
+                # probabilistic and deterministic time windows are equal create only the deterministic scenario.
 
-                rtaWpts = [0]
-                idx     = 0
+                twWidths = { '01': 1, '60': 60, 'deterministic':  int(scenario.tw_deterministic)}
 
-                while idx < scenario.data.index[-1]:
-
-                    wptimedelta = (scenario.data['time_over'][idx+1:] - \
-                                    scenario.data['time_over'][idx]).dt.total_seconds()
-                    if wptimedelta[wptimedelta > int(afms_mode["wp_frequency"])].size:
-                        idx = wptimedelta[wptimedelta > int(afms_mode["wp_frequency"])].index[0]
-                    else:
-                        idx = scenario.data.index[-1]
-
-                    rtaWpts.append(idx)
-
+                if twWidths["deterministic"] == int(scenario.tw_probabilistic):
+                     twWidths['probabilistic'] = int(scenario.tw_probabilistic)
 
                 for key in twWidths:
 
                     if key == "60":
                         rtaWpts = [0,scenario.data.index[-1]]
+                    else:
+
+                        # define the way-points that have an RTA constraint. Start out with the first way-point
+                        # such that the AFMS is activated and then continue such that there is a waypoint
+                        # with an RTA at least wp_frequency seconds (set in adaptsettings.cfg) away from the last
+                        # waypoint with an RTA.
+
+                        rtaWpts = [0]  # list of way-points that have an RTA constraint
+                        currentwp = 0  # current way-point
+
+                        # as long as there are way-points
+                        while currentwp < scenario.data.index[-1]:
+
+                            # calculate the number of seconds from current way-point to all the other way-points left in
+                            # the trajectory
+                            wptimedelta = (scenario.data['time_over'][currentwp + 1:] - \
+                                           scenario.data['time_over'][currentwp]).dt.total_seconds()
+
+                            # store the first waypoint that is at least wp_frequency away from the current way-point, if
+                            # no waypoint is wp_frequency away it means that you are near the end of the trajectory
+                            # so just store the last waypoint in the trajectory
+
+                            if wptimedelta[wptimedelta > int(afms_mode["wp_frequency"])].size:
+                                currentwp = wptimedelta[wptimedelta > int(afms_mode["wp_frequency"])].index[0]
+                            else:
+                                currentwp = scenario.data.index[-1]
+
+                            rtaWpts.append(currentwp)
 
                     scnfilename = ".".join(["_".join([key,
                                                      scenario.acid,
@@ -120,16 +139,16 @@ if __name__ == "__main__":
 
                     print("              ","scnfile >>> {} ".format(scnfilename))
 
-
                     with open(os.path.join(currentScndir,scnfilename),"w") \
                             as scnfile:
 
                         scnfile.write(scenario.initialise_simulation())
                         scnfile.write(scenario.defwpt_command())
                         scnfile.write(scenario.addwpt_command(with_spd=False))
-                        scnfile.write(scenario.rta_command(rtaWpts))
-                        scnfile.write(scenario.twSize_command(rtaWpts,twWidths[key]))
-                        scnfile.write(scenario.afms_command(rtaWpts,"tw"))
+                        rta, tw, afms = scenario.tw_commands(rtaWpts, twWidths[key])
+                        scnfile.write(rta)
+                        scnfile.write(tw)
+                        scnfile.write(afms)
                         scnfile.write(scenario.start_log(log_type=logType))
                         scnfile.write(scenario.start_simulation())
 

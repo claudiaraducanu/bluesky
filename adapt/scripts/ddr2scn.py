@@ -8,8 +8,9 @@ import os
 import pandas as pd
 import sys
 sys.path.append('/Users/Claudia/Documents/5-MSc-2/bluesky')
-from bluesky.tools import aero, geo
-import numpy as np
+from    bluesky.tools import aero, geo
+import  numpy as np
+import  datetime
 
 class parseDDR():
 
@@ -115,7 +116,6 @@ class parseDDR():
         Include BlueSky CRE stack command, that creates the aircraft
         :return: string of CRE stack command
         """
-        # TODO add code to accommodate option to start the simulation at the origin and end at destination
 
         spd,hdg = self._avg_spd(self.data.iloc[0],self.data.iloc[1])
         spd = str(int(spd))
@@ -212,44 +212,59 @@ class parseDDR():
 
         return "".join(all_after)
 
-    def rta_command(self,wptList):
-        """
-        :param wpt:
-        :return:
-        """
-        rtas = []
+    def rta_commands(self,wptList):
+
+        cmdrtas     = []
+        cmdafmss     = []
 
         for wpt in wptList:
 
-            time = self.data.loc[wpt].time_over.time().strftime("%H:%M:%S")
-            rtaCmd =  "0:00:00.00>{} ".format(self.acid) + "RTA_AT " + "wpt_{} ".format(str(wpt)) + \
-                        time + "\n"
-            rtas.append(rtaCmd)
+            # set the required arrival time at a way-point to be DDR time over
+            rtatime = self.data.loc[wpt].time_over.time().strftime("%H:%M:%S")
 
-        return "".join(rtas)
+            # RTA_AT
+            cmdrta =  "0:00:00.00>{} ".format(self.acid) + "RTA_AT " + "wpt_{} ".format(str(wpt)) + \
+                      rtatime  + "\n"
+            cmdrtas.append(cmdrta)
 
-    def twSize_command(self,wptList,twSize):
-        """
-        :param wpt:
-        :return:
-        """
-        rtas = []
+            # AFMS_FROM
+            cmdafms =  "0:00:00.00>{} ".format(self.acid) + "AFMS_FROM " + "wpt_{} ".format(str(wpt)) + \
+                       "tw" + "\n"
+            cmdafmss.append(cmdafms)
+
+        return "".join(cmdrtas),"".join(cmdafmss)
+
+    def tw_commands(self,wptList,twSize):
+
+        cmdrtas     = []
+        cmdtws      = []
+        cmdafmss     = []
 
         for wpt in wptList:
 
-            rtaCmd =  "0:00:00.00>{} ".format(self.acid) + "TW_SIZE_AT " + "wpt_{} ".format(str(wpt)) + \
+            # set the required arrival time at a way-point to be ahead of the DDR time over way-point by half
+            # a time window length. Explanation:
+            #       | - RTA
+            #       [|------------------------] - time window definition in reality
+            #       [ -----------|------------] - time wind required in simulation because current AFMS logic
+            #                                     aims to the middle of the time window.
+
+            rtadate = self.data.loc[wpt].time_over + datetime.timedelta(seconds=float(twSize)*60/2)
+            rtatime = rtadate.time().strftime("%H:%M:%S")
+
+            # RTA_AT
+            cmdrta =  "0:00:00.00>{} ".format(self.acid) + "RTA_AT " + "wpt_{} ".format(str(wpt)) + \
+                      rtatime  + "\n"
+            cmdrtas.append(cmdrta)
+
+            # TW_SIZE_AT
+            cmdtw =  "0:00:00.00>{} ".format(self.acid) + "TW_SIZE_AT " + "wpt_{} ".format(str(wpt)) + \
                         str(twSize*60) + "\n"
-            rtas.append(rtaCmd)
+            cmdtws.append(cmdtw)
 
-        return "".join(rtas)
+            # AFMS_FROM
+            cmdafms =  "0:00:00.00>{} ".format(self.acid) + "AFMS_FROM " + "wpt_{} ".format(str(wpt)) + \
+                       "tw" + "\n"
+            cmdafmss.append(cmdafms)
 
-    def afms_command(self,wptList,twType):
-
-        rtas = []
-
-        for wpt in wptList:
-
-            rtaCmd =  "0:00:00.00>{} ".format(self.acid) + "AFMS_FROM " + "wpt_{} ".format(str(wpt)) + twType + "\n"
-            rtas.append(rtaCmd)
-
-        return "".join(rtas)
+        return "".join(cmdrtas),"".join(cmdtws),"".join(cmdafmss)

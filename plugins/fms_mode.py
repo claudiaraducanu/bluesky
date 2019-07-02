@@ -134,34 +134,34 @@ def init_plugin():
 
 class Afms:
     """ Advanced FMS: dynamically adjust speed of flights based on set AFMS mode and/or RTA/Time Window"""
+
     def __init__(self):
         super(Afms, self).__init__()
         # Parameters of afms
-        self.dt = 60.0                          # [s] frequency of afms update (simtime)
-        self.skip2next_rta_time_s = 300.0       # Time when skipping to the RTA beyond the active RTA
-        self.rta_standard_window_size = 60.     # [s] standard time window size for rta in seconds
-        self._patch_route(self.rta_standard_window_size)
+        self.dt                                     = 60.0    # [s] frequency of afms update (simtime)
+        self.skip2next_rta_time_s                   = 300.0   # [s] sw
+        self.twdefault                               = 60.0    # [s] standard time window size for
+        self._patch_route(self.twdefault)
         self._fms_modes = ['OFF', 'CONTINUE', 'OWN', 'RTA', 'TW']
 
     @staticmethod
-    def _patch_route(rta_standard_window_size):  #
+    def _patch_route(twdefault):  #
         """
-        Patch the route class to allow for new data types needed for AFMS.
-        These include wprta, wprta_window_size, wpfms_mode, and wpown.
-        wprta indicates the rta time
-        wprta_window_size gives the time window size in seconds
+        Patch the route class to allow for new data types needed for AFMS. These include wprta, wprta_window_size,
+        wpfms_mode, and wpown, wprta indicates the rta time, wprta_window_size gives the time window size in seconds
         wpfms_mode gives the used afms mode
         wpown gives the preferred speed (Mach or CAS in m/s)
         """
-        Route._rta_standard_window_size = rta_standard_window_size
+        Route.twdefault = twdefault
         old_route_init = Route.__init__
 
         def new_route_init(self, *k, **kw):
             old_route_init(self, *k, **kw)
-            self.wprta = []  # [s] Required Time of Arrival to WPT
-            self.wprta_window_size = []  # [s] Window size around RTA
-            self.wpfms_mode = []  # Advanced FMS mode
-            self.wpown = []  # Own speed for TW/OWN Advanced FMS mode
+
+            self.wprta                  = []  # [s] required time of arrival at way-point
+            self.wptw                   = []  # [s] time window size around RTA
+            self.wpfms_mode             = []  # afms mode from way-point
+            self.wpown                  = []  # own speed for TW/OWN Advanced FMS mode
 
         Route.__init__ = new_route_init
 
@@ -171,12 +171,12 @@ class Afms:
             old_route_addwpt_data(self, overwrt, wpidx, *k, **kw)
             if overwrt:
                 self.wprta[wpidx] = -1.  # negative indicates no rta
-                self.wprta_window_size[wpidx] = Route._rta_standard_window_size
+                self.wprta_window_size[wpidx] = Route.twdefault
                 self.wpfms_mode[wpidx] = 1  # Set advanced FMS mode to continue
                 self.wpown[wpidx] = -1  # Set own spd index to use previous setting
             else:
                 self.wprta.insert(wpidx, -1.)  # negative indicates no rta
-                self.wprta_window_size.insert(wpidx, Route._rta_standard_window_size)
+                self.wprta_window_size.insert(wpidx, Route.twdefault)
                 self.wpfms_mode.insert(wpidx, 1)  # Set advanced FMS mode to continue
                 self.wpown.insert(wpidx, -1)  # Set own speed index to use previous own speed setting
 
