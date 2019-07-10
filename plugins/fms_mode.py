@@ -135,7 +135,7 @@ class Afms(TrafficArrays):
             if name in traf.ap.route[idx].wpname:
 
                 wpidx = traf.ap.route[idx].wpname.index(name)
-                traf.ap.route[idx].wprta[wpidx] = datetime.strptime(wprtatime, '%Y%H:%M:%S').time()
+                traf.ap.route[idx].wprta[wpidx] = datetime.strptime(wprtatime, "%Y-%m-%d %H:%M:%S").time()
                 traf.ap.route[idx].rta.append(wpidx)
 
                 return True, traf.id[idx] + " has rta at way-point " + name + " at " + \
@@ -224,8 +224,7 @@ class Afms(TrafficArrays):
         :return:    required time of arrival at in seconds
         """
 
-        tdelta = datetime.strptime(timestamp.strftime('%H:%M:%S') -\
-                 datetime.strptime(sim.utc.time().strftime('%H:%M:%S'), '%H:%M:%S')
+        tdelta = timestamp - sim.utc.time()
 
         if tdelta.days < 0:
             tdelta = timedelta(days=0, seconds=tdelta.seconds, microseconds=tdelta.microseconds)

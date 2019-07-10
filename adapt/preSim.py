@@ -144,12 +144,12 @@ if __name__ == "__main__":
                             as scnfile:
 
                         scnfile.write(scenario.initialise_simulation())
+                        scnfile.write(scenario.cre())
                         scnfile.write(scenario.defwpt_command())
                         scnfile.write(scenario.addwpt_command(with_spd=False))
-                        rta, tw, afms = scenario.tw_commands(rtaWpts, twWidths[key])
-                        scnfile.write(rta)
-                        scnfile.write(tw)
-                        scnfile.write(afms)
+                        scnfile.write(scenario.rta_commands(rtaWpts))
+                        scnfile.write(scenario.tw_command(twWidths[key]))
+                        scnfile.write(scenario.afms_command())
                         scnfile.write(scenario.start_log(log_type=logType))
                         scnfile.write(scenario.start_simulation())
 

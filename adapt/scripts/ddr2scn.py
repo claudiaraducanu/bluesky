@@ -15,7 +15,7 @@ import  datetime
 class parseDDR():
 
 
-    def __init__(self,fpath,cruise=False):
+    def __init__(self,fpath,cruise=True):
         """
 
         :param fpath: Complete path of file which contains trajectory data in ddr format. The file type has to
@@ -77,8 +77,9 @@ class parseDDR():
                     inplace=True)
 
         # Only get cruise waypoints
+        # BADA cruise refernce mach used after FL140 => FL140 change cruise way-point threshold
         if cruise:
-            data = data.loc[data.fl > 150.]
+            data = data.loc[data.fl > 140.]
             data = data.reset_index()
             data = data.drop('order',axis=1)
 
@@ -111,21 +112,31 @@ class parseDDR():
 
         return v_cas,hdg
 
-    def _cre(self):
+    def cre(self,mcr,cascr):
         """
         Include BlueSky CRE stack command, that creates the aircraft
         :return: string of CRE stack command
         """
 
-        spd,hdg = self._avg_spd(self.data.iloc[0],self.data.iloc[1])
-        spd = str(int(spd))
+        _,hdg = self._avg_spd(self.data.iloc[0],self.data.iloc[1])
+        h_transition = aero.crossoveralt(cascr*aero.kts,mcr)
+        h_current    = int(str(self.data.iloc[0].fl) + "00")* aero.ft
 
-        return '00:00:00.00>CRE ' + ", ".join([self.acid, self.ac_type,
-                                             str(self.data.iloc[0].x_coord),
-                                             str(self.data.iloc[0].y_coord),
-                                             str(hdg),
-                                             str(self.data.iloc[0].fl) + "00",
-                                             spd]) + "\n"
+        if h_current > h_transition:
+
+            return '00:00:00.00>CRE ' + ", ".join([self.acid, self.ac_type,
+                                                 str(self.data.iloc[0].x_coord),
+                                                 str(self.data.iloc[0].y_coord),
+                                                 str(hdg),
+                                                 str(self.data.iloc[0].fl) + "00",
+                                                str(mcr) + "\n"])
+        else:
+            return '00:00:00.00>CRE ' + ", ".join([self.acid, self.ac_type,
+                                               str(self.data.iloc[0].x_coord),
+                                               str(self.data.iloc[0].y_coord),
+                                               str(hdg),
+                                               str(self.data.iloc[0].fl) + "00",
+                                               str(cascr) + "\n"])
 
     def start_simulation(self):
         """
@@ -163,12 +174,12 @@ class parseDDR():
         return "0:00:00.00>DUMPRTE {}\n".format(self.acid)
 
     def initialise_simulation(self):
+
         """
         Include HOLD, DATE stack command.
         :return: string of HOLD, DATE stack commands
         """
-        return "00:00:00.00>hold \n00:00:00.00>date {}\n".format(self.date_start.strftime("%d %m %Y %H:%M:%S.00")) + \
-               self._cre()
+        return "00:00:00.00>hold \n00:00:00.00>date {}\n".format(self.date_start.strftime("%d %m %Y %H:%M:%S.00"))
 
 
     def defwpt_command(self):
@@ -220,51 +231,26 @@ class parseDDR():
         for wpt in wptList:
 
             # set the required arrival time at a way-point to be DDR time over
-            rtatime = self.data.loc[wpt].time_over.time().strftime("%H:%M:%S")
+            rtatime = self.data.loc[wpt].time_over.strftime("%Y-%m-%d %H:%M:%S")
 
             # RTA_AT
-            cmdrta =  "0:00:00.00>{} ".format(self.acid) + "RTA_AT " + "wpt_{} ".format(str(wpt)) + \
+            cmdrta =  "0:00:00.00>RTA {} ".format(self.acid) + "wpt_{} ".format(str(wpt)) + \
                       rtatime  + "\n"
             cmdrtas.append(cmdrta)
 
-            # AFMS_FROM
-            cmdafms =  "0:00:00.00>{} ".format(self.acid) + "AFMS_FROM " + "wpt_{} ".format(str(wpt)) + \
-                       "tw" + "\n"
-            cmdafmss.append(cmdafms)
+        return "".join(cmdrtas)
 
-        return "".join(cmdrtas),"".join(cmdafmss)
+    def tw_command(self,twSize):
 
-    def tw_commands(self,wptList,twSize):
 
-        cmdrtas     = []
-        cmdtws      = []
-        cmdafmss     = []
+        # TW_SIZE_AT
+        cmdtw =  "0:00:00.00>TW {} ".format(self.acid) + str(twSize*60) + "\n"
 
-        for wpt in wptList:
+        return  cmdtw
 
-            # set the required arrival time at a way-point to be ahead of the DDR time over way-point by half
-            # a time window length. Explanation:
-            #       | - RTA
-            #       [|------------------------] - time window definition in reality
-            #       [ -----------|------------] - time wind required in simulation because current AFMS logic
-            #                                     aims to the middle of the time window.
+    def afms_command(self):
 
-            rtadate = self.data.loc[wpt].time_over + datetime.timedelta(seconds=float(twSize)*60/2)
-            rtatime = rtadate.time().strftime("%H:%M:%S")
+        # TW_SIZE_AT
+        cmdafms =  "0:00:00.00>AFMS {} ".format(self.acid) + "ON\n"
 
-            # RTA_AT
-            cmdrta =  "0:00:00.00>{} ".format(self.acid) + "RTA_AT " + "wpt_{} ".format(str(wpt)) + \
-                      rtatime  + "\n"
-            cmdrtas.append(cmdrta)
-
-            # TW_SIZE_AT
-            cmdtw =  "0:00:00.00>{} ".format(self.acid) + "TW_SIZE_AT " + "wpt_{} ".format(str(wpt)) + \
-                        str(twSize*60) + "\n"
-            cmdtws.append(cmdtw)
-
-            # AFMS_FROM
-            cmdafms =  "0:00:00.00>{} ".format(self.acid) + "AFMS_FROM " + "wpt_{} ".format(str(wpt)) + \
-                       "tw" + "\n"
-            cmdafmss.append(cmdafms)
-
-        return "".join(cmdrtas),"".join(cmdtws),"".join(cmdafmss)
+        return  cmdafms
