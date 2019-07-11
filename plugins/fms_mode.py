@@ -6,7 +6,7 @@ from plugins.patch_route import patch_route
 import numpy as np
 
 from bluesky import sim, stack, traf, tools  #, settings, navdb, sim, scr, tools
-from bluesky.tools import TrafficArrays, RegisterElementParameters
+from bluesky.tools import aero,geo,TrafficArrays, RegisterElementParameters
 from bluesky.traffic.route import Route
 from bluesky.traffic.performance.legacy.performance import PHASE
 
@@ -71,10 +71,10 @@ def init_plugin():
             'the own speed (=preferred speed) using the OWN_SPEED_FROM command'],
         'RTA': [
             # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
-            'RTA acid, wpname yyyy-mm-dd HH:MM:SS',
+            'RTA acid,wpname,day,month,year,HH:MM:SS',
 
             # A list of the argument types your function accepts. For a description of this, see ...
-            'acid, wpinroute, txt',
+            'acid,wpinroute,int,int,int,txt',
 
             # The name of your function in this plugin
             afms.set_rta,
@@ -112,30 +112,34 @@ class Afms(TrafficArrays):
         super(Afms, self).__init__()
         # Parameters of afms
         self.dt                                     = 60.0    # [s] frequency of AFMS update
-        self.skip2next_rta_time_s                   = 300.0   # [s] sw
+        self.skip2nwp                               = 300.0   # [s] sw
         # Path the route class with some extra default variables to store route information associate to time windows
         patch_route()
 
         with RegisterElementParameters(self):
-            self.afmsOn      = np.array([],dtype = np.bool) # In test area or not
+            self.afmsOn      = np.array([],dtype = np.bool) # AFMS on or off
+            self.rtaTime     = np.array([])                 # current active way-point with RTA
 
     def create(self, n=1):
         super(Afms, self).create(n)
-        self.afmsOn[-n:] = False
+        self.afmsOn[-n:]    = False
 
     def set_rta(self,*args):
 
-        if len(args) != 3:
-            return False, 'RTA function requires 3 arguments acid, wpname, HH:MM:SS'
+        if len(args) != 6:
+            return False, 'RTA function requires 6 arguments acid, wpname,day,month,year,HH:MM:SS'
         else:
 
-            idx,name,wprtatime  = args[0],args[1],args[2]
+            idx,name,day,month,year,wprtatime  = args[0],args[1],args[2],args[3],args[4],args[5]
 
             # make sure that the way-point exists
             if name in traf.ap.route[idx].wpname:
 
                 wpidx = traf.ap.route[idx].wpname.index(name)
-                traf.ap.route[idx].wprta[wpidx] = datetime.strptime(wprtatime, "%Y-%m-%d %H:%M:%S").time()
+                traf.ap.route[idx].wprta[wpidx] = datetime.strptime(
+                                                    f'{year},{month},{day},{wprtatime}',
+                                                    '%Y,%m,%d,%H:%M:%S.%f' if '.' in wprtatime else
+                                                    '%Y,%m,%d,%H:%M:%S')
                 traf.ap.route[idx].rta.append(wpidx)
 
                 return True, traf.id[idx] + " has rta at way-point " + name + " at " + \
@@ -206,38 +210,58 @@ class Afms(TrafficArrays):
             for idx in afmsIds:
                 if int(traf.perf.phase[idx]) != PHASE['CR']:
                     pass
+
                 else:
 
+                    """Calculate the required time of arrival to reach the middle of the time window and the 
+                     maximum and minimum required time of arrival based on time window length  """
+
                     # get the RTA and TW length at the current way-point with RTA constraint
-                    rtaTime  = traf.ap.route[idx].wprta[traf.ap.route[idx].iacwprta] # [HH:MM:SS] required time of arrival
+                    rtaTime  = traf.ap.route[idx].wprta[traf.ap.route[idx].iacwprta] # required time of arrival
                     tw       = traf.ap.route[idx].wptw[traf.ap.route[idx].iacwprta]  # [s] time window length
 
-                    # convert the RTA timestamp to seconds from simulation start time
-                    rtaSimt  = self.timestamp2simt(rtaTime)
+                    # convert the RTA timestamp to seconds from simulation time
+                    rtaSimt = (rtaTime - sim.utc).total_seconds() # [s]
+
+                    # If the time of arrival in the middle of the way-point is
+
+                    # get the earliest arrival time within the time window
+                    lower_rtaSimt = max(rtaSimt - tw/2, 0)
+                    # get the latest arrival time within the time window
+                    upper_rtaSimt = max(rtaSimt + tw/2, 0)
 
 
-    @staticmethod
-    def timestamp2simt(timestamp):  #
-        """
-        Calculate time in seconds to next RTA waypoint
-        :param      time2: RTA in time format
-        :return:    required time of arrival at in seconds
-        """
+                    """" Estimated time of arrival at the middle of the time window"""
 
-        tdelta = timestamp - sim.utc.time()
+                    # calcualte the distance from current postion to the active way-point
+                    _, dist2nextwp = geo.qdrdist(traf.lat[idx], traf.lon[idx],
+                                                    traf.ap.route[idx].wplat[traf.ap.route[idx].iactwp],
+                                                    traf.ap.route[idx].wplon[traf.ap.route[idx].iactwp])        # [nm]
 
-        if tdelta.days < 0:
-            tdelta = timedelta(days=0, seconds=tdelta.seconds, microseconds=tdelta.microseconds)
-            return tdelta.seconds - 86400
-        else:
-            return tdelta.seconds
+                    # distances between way-points up until the active way-point with RTA
+                    distto         = np.concatenate((np.array([dist2nextwp]),
+                                                            traf.ap.route[idx].wpdistto[
+                                                            traf.ap.route[idx].iactwp+1:
+                                                            traf.ap.route[idx].iacwprta+1]),axis=0) * aero.nm   # [m]
 
-    #                 rta_init_index, rta_last_index, rta = self._current_rta(idx)
-    #                 time_s2rta = self._time_s2rta(rta)
+                    # flight levels at each way-point between current position and the activate way-point with RTA
+                    flightlevels   = np.concatenate((np.array([traf.alt[idx]]),
+                                                    traf.ap.route[idx].wpalt[
+                                                    traf.ap.route[idx].iactwp:
+                                                    traf.ap.route[idx].iacwprta]),axis=0)                   # [m]
+                    # Assumption is instantaneous climb to next flight level, and instantaneous speed change at new
+                    # flight level. Calculate the time when flying with the current CAS between way-points up until
+                    # the active way-point with RTA.
+                    # calculate the TAS schedule
+                    currentCAS          = np.array([traf.cas[idx]]*flightlevels.size)   # [m/s]
+                    currentTASschedule  = aero.vcas2tas(currentCAS, flightlevels)       # [m/s]
+
+                    timeto              = np.divide(distto,currentTASschedule)           # [s]
+                    estimatedETA        = np.sum(timeto)                                 # [s]
+
+                    """Switch current active way-point with RTA """
+
     #                 if time_s2rta < self.skip2next_rta_time_s:
-    #                     # Don't give any speed instructions in the last section (Keep stable speed)
-    #                     # rta_init_index, rta_last_index, rta = self._current_rta_plus_one(idx)
-    #                     # time_s2rta = self._time_s2rta(rta)
     #                     pass
     #                 else:
     #                     _, dist2nwp = tools.geo.qdrdist(traf.lat[idx], traf.lon[idx],
@@ -335,115 +359,28 @@ class Afms(TrafficArrays):
     #                 return False, 'AFMS mode does not exist' + traf.id[idx]
     #         else:
     #             pass
-    #
 
-    # def _current_rta_plus_one(self, idx):  #
-    #     """
-    #     Identify rta beyond active rta
-    #     :param idx: aircraft index
-    #     :return: initial index active rta, last index rta beyond activate rta, rta: rta beyond activate rta
-    #     """
-    #     init_index_rta, last_index_active_rta, active_rta = self._current_rta(idx)
-    #     beyond_rta_index = next((index for index, value in enumerate(traf.ap.route[idx].wprta[last_index_active_rta+1:]) if
-    #                       isinstance(value, time)), -1)
-    #     beyond_rta = traf.ap.route[idx].wprta[last_index_active_rta+1:][beyond_rta_index] if beyond_rta_index > -1 else -1
-    #     if beyond_rta_index > -1:
-    #         return init_index_rta, last_index_active_rta + 1 + beyond_rta_index, beyond_rta
-    #     else:
-    #         return init_index_rta, last_index_active_rta, active_rta
-    #
-    #
-    # def _current_own_spd(self, idx):  #
-    #     """
-    #     Identify active own Mach or CAS
-    #     :param idx: aircraft index
-    #     :return: Mach or CAS (or -1 in no speed is specified)
-    #     """
-    #     own_spd_index = next((index for index, value in reversed(list(enumerate(traf.ap.route[idx].wpown[
-    #                                                                              :traf.ap.route[idx].iactwp])))
-    #                            if value >= 0), -1)
-    #     if own_spd_index < 0:
-    #         return -1  # NO OWN SPEED SPECIFIED
-    #     else:
-    #         return traf.ap.route[idx].wpown[:traf.ap.route[idx].iactwp][own_spd_index]
-    #
-    # def _current_tw_size(self, idx):  #
-    #     """
-    #     Identify active time window size
-    #     :param idx: aircraft index
-    #     :return: initial index tw, last index tw, time_window_size: active tw
-    #     """
-    #     rta_index = next((index for index, value in enumerate(traf.ap.route[idx].wprta[traf.ap.route[idx].iactwp:]) if
-    #                       isinstance(value, time)), -1)
-    #     tw_size = traf.ap.route[idx].wprta_window_size[traf.ap.route[idx].iactwp:][rta_index] if rta_index > -1 else 60.0
-    #     if rta_index > -1:
-    #         return traf.ap.route[idx].iactwp, traf.ap.route[idx].iactwp + rta_index, tw_size
-    #     else:
-    #         return -1, -1, tw_size
-    #
-    def _time_s2rta(self, time2):  #
+
+    def _cas2rta(self, distances_nm, flightlevels_m, time2rta_s, current_cas_m_s):  #
         """
-        Calculate time in seconds to next RTA waypoint
-        :param time2: RTA in time format
-        :return: time in seconds
+        Calculate the CAS needed to arrive at the RTA waypoint in the specified time
+        No wind is taken into account.
+        :param distances: distances between waypoints
+        :param flightlevels: flightlevels for sections
+        :param time2rta_s: time in seconds to RTA waypoint
+        :param current_cas_m_s: current CAS in m/s
+        :return: CAS in m/s
         """
-        time1 = sim.utc.time() # current UTC simulation time
-        time_format = '%H:%M:%S'
-        tdelta = datetime.strptime(time2.strftime(time_format), time_format) -\
-                 datetime.strptime(time1.strftime(time_format), time_format)
-        if tdelta.days < 0:
-            tdelta = timedelta(days=0, seconds=tdelta.seconds, microseconds=tdelta.microseconds)
-            return tdelta.seconds - 86400
-        else:
-            return tdelta.seconds
-    #
-    # def _cas2rta(self, distances_nm, flightlevels_m, time2rta_s, current_cas_m_s):  #
-    #     """
-    #     Calculate the CAS needed to arrive at the RTA waypoint in the specified time
-    #     No wind is taken into account.
-    #     :param distances: distances between waypoints
-    #     :param flightlevels: flightlevels for sections
-    #     :param time2rta_s: time in seconds to RTA waypoint
-    #     :param current_cas_m_s: current CAS in m/s
-    #     :return: CAS in m/s
-    #     """
-    #     iterations = 4
-    #     estimated_cas_m_s = current_cas_m_s
-    #     for i in range(iterations):
-    #         estimated_time2rta_s = self._eta2tw_new_cas_wfl(distances_nm, flightlevels_m, current_cas_m_s,
-    #                                                         estimated_cas_m_s)
-    #         previous_estimate_m_s = estimated_cas_m_s
-    #         estimated_cas_m_s = estimated_cas_m_s * estimated_time2rta_s / (time2rta_s + 0.00001)
-    #         if abs(previous_estimate_m_s - estimated_cas_m_s) < 0.1:
-    #             break
-    #     return estimated_cas_m_s
-    #
-    # def _eta2tw_cas_wfl(self, distances_nm, flightlevels_m, cas_m_s):
-    #     """
-    #     Estimate for the given CAS the ETA to the next TW waypoint
-    #     No wind is taken into account.
-    #     :param distances: distances between waypoints
-    #     :param flightlevels: flightlevels for sections
-    #     :param cas_m_s: CAS in m/s
-    #     :return: ETA in seconds
-    #     """
-    #     distances_m = distances_nm * 1852
-    #     times_s = np.empty_like(distances_m)
-    #     previous_fl_m = flightlevels_m[0]
-    #
-    #     # Assumption is instantanuous climb to next flight level, and instantanuous speed change at new flight level
-    #     for i, distance_m in enumerate(distances_m):
-    #         if flightlevels_m[i] < 0:
-    #             next_fl_m = previous_fl_m
-    #         else:
-    #             next_fl_m = flightlevels_m[i]
-    #             previous_fl_m = next_fl_m
-    #         next_tas_m_s = tools.aero.vcas2tas(cas_m_s, next_fl_m)
-    #         step_time_s = distance_m / (next_tas_m_s + 0.00001)
-    #         times_s[i] = step_time_s
-    #
-    #     total_time_s = np.sum(times_s)
-    #     return total_time_s
+        iterations = 4
+        estimated_cas_m_s = current_cas_m_s
+        for i in range(iterations):
+            estimated_time2rta_s = self._eta2tw_new_cas_wfl(distances_nm, flightlevels_m, current_cas_m_s,
+                                                            estimated_cas_m_s)
+            previous_estimate_m_s = estimated_cas_m_s
+            estimated_cas_m_s = estimated_cas_m_s * estimated_time2rta_s / (time2rta_s + 0.00001)
+            if abs(previous_estimate_m_s - estimated_cas_m_s) < 0.1:
+                break
+        return estimated_cas_m_s
     #
     # def _dtime2new_cas(self, flightlevel_m, current_cas_m_s, new_cas_m_s):
     #     """
@@ -468,19 +405,19 @@ class Afms(TrafficArrays):
     #         a = deceleration_m_s2
     #     return 0.5 * (new_tas_m_s - current_tas_m_s) ** 2 / a / (current_tas_m_s + 0.000001)
     #
-    # def _eta2tw_new_cas_wfl(self, distances_nm, flightlevels_m, current_cas_m_s, new_cas_m_s):  #
-    #     """
-    #     Estimate for the current CAS and new CAS the ETA to the next TW waypoint
-    #     No wind is taken into account.
-    #     :param distances: distances between waypoints
-    #     :param flightlevels: flightlevels for sections
-    #     :param current_cas_m_s: current CAS in m/s
-    #     :param new_cas_m_s: new CAS in m/s
-    #     :return: ETA in seconds
-    #     """
-    #     total_time_s = self._eta2tw_cas_wfl(distances_nm, flightlevels_m, new_cas_m_s) - \
-    #                    self._dtime2new_cas(flightlevels_m[0], current_cas_m_s, new_cas_m_s)
-    #     if total_time_s < 0:
-    #         return 0.0
-    #     else:
-    #         return total_time_s
+    def _eta2tw_new_cas_wfl(self, distances_nm, flightlevels_m, current_cas_m_s, new_cas_m_s):  #
+        """
+        Estimate for the current CAS and new CAS the ETA to the next TW waypoint
+        No wind is taken into account.
+        :param distances: distances between waypoints
+        :param flightlevels: flightlevels for sections
+        :param current_cas_m_s: current CAS in m/s
+        :param new_cas_m_s: new CAS in m/s
+        :return: ETA in seconds
+        """
+        total_time_s = self._eta2tw_cas_wfl(distances_nm, flightlevels_m, new_cas_m_s) - \
+                       self._dtime2new_cas(flightlevels_m[0], current_cas_m_s, new_cas_m_s)
+        if total_time_s < 0:
+            return 0.0
+        else:
+            return total_time_s

@@ -231,7 +231,7 @@ class parseDDR():
         for wpt in wptList:
 
             # set the required arrival time at a way-point to be DDR time over
-            rtatime = self.data.loc[wpt].time_over.strftime("%Y-%m-%d %H:%M:%S")
+            rtatime = self.data.loc[wpt].time_over.strftime("%d %m %Y %H:%M:%S.00")
 
             # RTA_AT
             cmdrta =  "0:00:00.00>RTA {} ".format(self.acid) + "wpt_{} ".format(str(wpt)) + \
