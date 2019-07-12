@@ -247,20 +247,55 @@ class Afms(TrafficArrays):
                     # flight levels at each way-point between current position and the activate way-point with RTA
                     flightlevels   = np.concatenate((np.array([traf.alt[idx]]),
                                                     traf.ap.route[idx].wpalt[
-                                                    traf.ap.route[idx].iactwp:
-                                                    traf.ap.route[idx].iacwprta]),axis=0)                   # [m]
-                    # Assumption is instantaneous climb to next flight level, and instantaneous speed change at new
-                    # flight level. Calculate the time when flying with the current CAS between way-points up until
-                    # the active way-point with RTA.
-                    # calculate the TAS schedule
-                    currentCAS          = np.array([traf.cas[idx]]*flightlevels.size)   # [m/s]
-                    currentTASschedule  = aero.vcas2tas(currentCAS, flightlevels)       # [m/s]
+                                                    traf.ap.route[idx].iactwp + 1 :
+                                                    traf.ap.route[idx].iacwprta +1]),axis=0)                   # [m]
 
-                    timeto              = np.divide(distto,currentTASschedule)           # [s]
-                    estimatedETA        = np.sum(timeto)                                 # [s]
 
-                    """Switch current active way-point with RTA """
+                    """ Determine the CAS required to reach the RTA  """
 
+                    # Use as first estimate the TAS calculated using the distance divided by RTA time
+
+                    TASestimate        = traf.tas[idx] # initial guess is current speed [m/s]
+                    CASestimate        = traf.cas[idx]
+                    CASestimatePrev    = 0
+
+                    while abs(CASestimate - CASestimatePrev) > 0.1:
+
+                        # Compute the time to accelerate or decelerate to the new TAS
+                        delta_spd   = TASestimate - traf.tas[idx] # [m/s]
+                        need_ax     = np.abs(delta_spd) > aero.kts  # small threshold
+                        ax          = need_ax * np.sign(delta_spd) * traf.perf.acceleration()       # [m/s^2]
+
+                        if ax != 0:
+                            accTime     = np.divide(delta_spd,ax) # [s]
+                        else:
+                            accTime = 0.0
+
+                        # Calculate the ETA including the time it takes to accelerate
+                        ETAestimate     = self.eta2rta(CASestimate, distto, flightlevels) - accTime  #[s]
+                        # Save the previous
+
+                        CASestimatePrev  = CASestimate
+
+                        CASestimate      = CASestimate * ETAestimate / rtaSimt
+                        TASestimate  =  aero.cas2tas(CASestimate,flightlevels[0])
+
+                    iterations = 4
+                    estimated_cas = traf.cas[idx]
+                    for i in range(iterations):
+
+                        total_time_s = self.eta2rta(estimated_cas,distto,flightlevels)  - \
+                                       self._dtime2new_cas(flightlevels[0], traf.cas[idx], estimated_cas)
+                        if total_time_s < 0:
+                            estimated_time2rta_s = 0.0
+                        else:
+                            estimated_time2rta_s = total_time_s
+
+                        previous_estimate_m_s = estimated_cas
+                        estimated_cas = estimated_cas* estimated_time2rta_s / (rtaSimt+ 0.00001)
+                        if abs(previous_estimate_m_s - estimated_cas) < 1:
+                            break
+                    return estimated_cas    #
     #                 if time_s2rta < self.skip2next_rta_time_s:
     #                     pass
     #                 else:
@@ -360,64 +395,16 @@ class Afms(TrafficArrays):
     #         else:
     #             pass
 
+    @staticmethod
+    def eta2rta(currentCAS,distto,flightlevels):
+        # Assumption is instantaneous climb to next flight level, and instantaneous speed change at new
+        # flight level. Calculate the time when flying with the current CAS between way-points up until
+        # the active way-point with RTA.
+        currentCASschedule = np.array([currentCAS] * flightlevels.size)         # [m/s]
+        currentTASschedule = aero.vcas2tas(currentCASschedule, flightlevels)    # [m/s]
 
-    def _cas2rta(self, distances_nm, flightlevels_m, time2rta_s, current_cas_m_s):  #
-        """
-        Calculate the CAS needed to arrive at the RTA waypoint in the specified time
-        No wind is taken into account.
-        :param distances: distances between waypoints
-        :param flightlevels: flightlevels for sections
-        :param time2rta_s: time in seconds to RTA waypoint
-        :param current_cas_m_s: current CAS in m/s
-        :return: CAS in m/s
-        """
-        iterations = 4
-        estimated_cas_m_s = current_cas_m_s
-        for i in range(iterations):
-            estimated_time2rta_s = self._eta2tw_new_cas_wfl(distances_nm, flightlevels_m, current_cas_m_s,
-                                                            estimated_cas_m_s)
-            previous_estimate_m_s = estimated_cas_m_s
-            estimated_cas_m_s = estimated_cas_m_s * estimated_time2rta_s / (time2rta_s + 0.00001)
-            if abs(previous_estimate_m_s - estimated_cas_m_s) < 0.1:
-                break
-        return estimated_cas_m_s
-    #
-    # def _dtime2new_cas(self, flightlevel_m, current_cas_m_s, new_cas_m_s):
-    #     """
-    #     Estimated delta time between flying at current CAS, and
-    #     changing speed to the new CAS
-    #     :param flightlevel_m: Flightlevel in m
-    #     :param current_cas_m_s: current CAS in m/s
-    #     :param new_cas_m_s: new CAS in m/s
-    #     :return: delta time in seconds
-    #     """
-    #     # acceleration_m_s2 = 0.5
-    #     # deceleration_m_s2 = -0.5
-    #
-    #     current_tas_m_s = tools.aero.vcas2tas(current_cas_m_s, flightlevel_m)
-    #     new_tas_m_s = tools.aero.vcas2tas(new_cas_m_s, flightlevel_m)
-    #
-    #     if new_tas_m_s > current_tas_m_s:
-    #         #Acceleration
-    #         a = acceleration_m_s2
-    #     else:
-    #         #Deceleration
-    #         a = deceleration_m_s2
-    #     return 0.5 * (new_tas_m_s - current_tas_m_s) ** 2 / a / (current_tas_m_s + 0.000001)
-    #
-    def _eta2tw_new_cas_wfl(self, distances_nm, flightlevels_m, current_cas_m_s, new_cas_m_s):  #
-        """
-        Estimate for the current CAS and new CAS the ETA to the next TW waypoint
-        No wind is taken into account.
-        :param distances: distances between waypoints
-        :param flightlevels: flightlevels for sections
-        :param current_cas_m_s: current CAS in m/s
-        :param new_cas_m_s: new CAS in m/s
-        :return: ETA in seconds
-        """
-        total_time_s = self._eta2tw_cas_wfl(distances_nm, flightlevels_m, new_cas_m_s) - \
-                       self._dtime2new_cas(flightlevels_m[0], current_cas_m_s, new_cas_m_s)
-        if total_time_s < 0:
-            return 0.0
-        else:
-            return total_time_s
+        timeto          = np.divide(distto, currentTASschedule)                 # [s]
+        estimatedETA    = np.sum(timeto)                                        # [s]
+
+        return estimatedETA
+
