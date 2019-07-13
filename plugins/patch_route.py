@@ -25,12 +25,10 @@ def patch_route():
 
         old_route_addwpt_data(self, overwrt, wpidx, *k, **kw)
         if overwrt:
-            self.wprta[wpidx]   = -1.                           # negative indicates no required time of arrival
-            self.wptw[wpidx]    = -1                            # negative indicates no time window
+            self.wprta[wpidx]           = -1.                           # negative indicates no required time of arrival
 
         else:
             self.wprta.insert(wpidx,    -1.)
-            self.wptw.insert(wpidx,     -1)
 
     Route.addwpt_data       = new_route_addwpt_data
     old_route_del_wpt_data  = Route._del_wpt_data
