@@ -224,7 +224,7 @@ class Afms(TrafficArrays):
                     # convert the RTA timestamp to seconds from simulation time
                     rta = (rtaTime - sim.utc).total_seconds()  # [s]
 
-                    if ETAcurrent < self.twlength[idx]/2 or rta < 0:
+                    if ETAcurrent < 300 or rta < 0:
                         # set the current active way-point with RTA to the first element in the way-points with RTA list
                         if len(traf.ap.route[idx].rta):
                             traf.ap.route[idx].iacwprta = traf.ap.route[idx].rta[0]
