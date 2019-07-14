@@ -219,39 +219,53 @@ class Afms(TrafficArrays):
                     """ Determine whether with the current CAS you reach the RTA and time window"""
                     ETAcurrent = self.eta2rta(traf.cas[idx], distto, flightlevels)  # [s] calculated estimated time of
                     # arrival
+
+                    if ETAcurrent < 300 and len(traf.ap.route[idx].rta):
+
+                        # set the current active way-point with RTA to the first element in the way-points with RTA list
+                        traf.ap.route[idx].iacwprta = traf.ap.route[idx].rta[0]
+                        # remove the active rta from the list
+                        traf.ap.route[idx].rta = traf.ap.route[idx].rta[1:]
+
+                        distto          = self.distorta(idx)  # [m]
+                        # flight levels at each way-point between current position and the activate way-point with RTA
+                        flightlevels    = self.fl2rta(idx)  # [m]
+
+                        """ Determine whether with the current CAS you reach the RTA and time window"""
+                        ETAcurrent = self.eta2rta(traf.cas[idx], distto,
+                                                  flightlevels)  # [s] calculated estimated time of
+
+                    else:
+                        pass
+
                     # get the RTA at the current way-point with RTA constraint
                     rtaTime = traf.ap.route[idx].wprta[traf.ap.route[idx].iacwprta]  # required time of arrival
                     # convert the RTA timestamp to seconds from simulation time
                     rta = (rtaTime - sim.utc).total_seconds()  # [s]
 
-                    if ETAcurrent < 300 or rta < 0:
-                        # set the current active way-point with RTA to the first element in the way-points with RTA list
-                        if len(traf.ap.route[idx].rta):
-                            traf.ap.route[idx].iacwprta = traf.ap.route[idx].rta[0]
-                            # remove the active rta from the list
-                            traf.ap.route[idx].rta = traf.ap.route[idx].rta[1:]
-                        else:
-                            pass
+                    # If the time of arrival in the middle of the way-point is
+                    # get the earliest arrival time within the time window
+                    # lower_rta = max(rta - self.twlength[idx]/2, 0)
+                    # get the latest arrival time within the time window
+                    # upper_rta = rta + self.twlength[idx]/2
+
+                    upper_rta = rta + self.twlength[idx]
+
+                    # if the ETA is lower than the lower bound of the time window request to meet the lower bound by
+                    # speeding up the aircraft.
+                    # if      ETAcurrent < lower_rta:
+                    #     cas = self.cas2rta(distto, flightlevels, lower_rta)
+                    #     self.spdCmd(idx,cas,flightlevels)
+                    if    ETAcurrent < rta:
+                        cas = self.cas2rta(distto, flightlevels, upper_rta)
+                        self.spdCmd(idx,cas,flightlevels)
+                    # if the ETA is higher than the lower bound of the time window request to meet the RTA by slowinf
+                    # the aircraft down.
+                    elif    ETAcurrent > upper_rta:
+                        cas = self.cas2rta(distto, flightlevels, upper_rta)
+                        self.spdCmd(idx,cas,flightlevels)
+                    # if the ETA is width in the time window don't give any speed comands
                     else:
-
-                        # If the time of arrival in the middle of the way-point is
-                        # get the earliest arrival time within the time window
-                        lower_rta = max(rta - self.twlength[idx]/2, 0)
-                        # get the latest arrival time within the time window
-                        upper_rta = rta + self.twlength[idx]/2
-
-                        # if the ETA is lower than the lower bound of the time window request to meet the lower bound by
-                        # speeding up the aircraft.
-                        if      ETAcurrent < lower_rta:
-                            cas = self.cas2rta(distto, flightlevels, lower_rta)
-                            self.spdCmd(idx,cas,flightlevels)
-                        # if the ETA is higher than the lower bound of the time window request to meet the RTA by slowinf
-                        # the aircraft down.
-                        elif    ETAcurrent > upper_rta:
-                            cas = self.cas2rta(distto, flightlevels, upper_rta)
-                            self.spdCmd(idx,cas,flightlevels)
-                        # if the ETA is width in the time window don't give any speed comands
-                        else:
                             pass
 
     def cas2rta(self,distto,flightlevels,rta):
@@ -279,6 +293,8 @@ class Afms(TrafficArrays):
             if abs(traf.vs[idx]) < 2.5:  # Don't give a speed change when changing altitude
                 if aero.cas2mach(cas, flightlevels[0]) > traf.perf.mmo[idx]:
                     stack.stack(f'SPD {traf.id[idx]} {traf.perf.mmo[idx]}')
+                if cas < traf.perf.vmcr[idx]:
+                    stack.stack(f'SPD {traf.id[idx]} {traf.perf.vmcr[idx]/aero.kts}')
 
                 elif flightlevels[0] > traf.perf.hpdes:
                     stack.stack(f'SPD {traf.id[idx]}, {aero.cas2mach(cas, flightlevels[0])}')
