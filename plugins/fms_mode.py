@@ -273,7 +273,7 @@ class Afms(TrafficArrays):
 
         TASestimate = np.divide(np.sum(distto), rta)  # initial guess is current speed [m/s]
         CASestimate = aero.tas2cas(TASestimate, flightlevels[0])  # convert TAS to CAS
-        eta = self.eta2rta(CASestimate, distto, flightlevels)  # calculated estimated time of arrival
+        eta         = self.eta2rta(CASestimate, distto, flightlevels)  # calculated estimated time of arrival
 
         while abs(eta - rta) > 0.1:
             prevTASestimate = TASestimate
@@ -281,7 +281,7 @@ class Afms(TrafficArrays):
             TASestimate = eta * prevTASestimate / rta
 
             CASestimate = aero.tas2cas(TASestimate, flightlevels[0])
-            eta = self.eta2rta(CASestimate, distto, flightlevels)
+            eta         = self.eta2rta(CASestimate, distto, flightlevels)
 
         return CASestimate
 
@@ -340,7 +340,8 @@ class Afms(TrafficArrays):
 
     @staticmethod
     def fl2rta(idx):
-        # flight levels at each way-point between current position and the activate way-point with RTA
+        # flight levels at each way-point between current position and the activate way-point with RTA. Assume
+        # instantaneous flight level change. 
         flightlevels = np.concatenate((np.array([traf.alt[idx]]),
                                        traf.ap.route[idx].wpalt[
                                        traf.ap.route[idx].iactwp + 1:
