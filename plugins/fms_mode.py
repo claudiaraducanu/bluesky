@@ -296,7 +296,7 @@ class Afms(TrafficArrays):
                 if cas < traf.perf.vmcr[idx]:
                     stack.stack(f'SPD {traf.id[idx]} {traf.perf.vmcr[idx]/aero.kts}')
 
-                elif flightlevels[0] > traf.perf.hpdes:
+                elif flightlevels[0] > 7620.:#traf.perf.hpdes:
                     stack.stack(f'SPD {traf.id[idx]}, {aero.cas2mach(cas, flightlevels[0])}')
 
                 else:
