@@ -256,6 +256,7 @@ class Afms(TrafficArrays):
                     # if      ETAcurrent < lower_rta:
                     #     cas = self.cas2rta(distto, flightlevels, lower_rta)
                     #     self.spdCmd(idx,cas,flightlevels)
+
                     if    ETAcurrent < rta:
                         cas = self.cas2rta(distto, flightlevels, upper_rta)
                         self.spdCmd(idx,cas,flightlevels)
