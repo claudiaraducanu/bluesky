@@ -108,11 +108,9 @@ class logWpt(TrafficArrays):
 
     def log_data(self,idx):
 
-
         self.logger.log(
+
             np.array(traf.id)[idx],
-            # traf.wind.current_ensemble,
-            # traf.wind.filename.split("/")[-1],
             np.array(traf.type)[idx],
             traf.lat[idx],
             traf.lon[idx],
@@ -124,6 +122,7 @@ class logWpt(TrafficArrays):
             traf.perf.mass[idx])
 
     def update(self):
+
         if not self.active:
             pass
         else:

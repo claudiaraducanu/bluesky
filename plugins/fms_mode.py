@@ -6,19 +6,26 @@ from plugins.patch_route import patch_route
 import numpy as np
 
 from bluesky import sim, stack, traf, tools  #, settings, navdb, sim, scr, tools
-from bluesky.tools import aero,geo,TrafficArrays, RegisterElementParameters
+from bluesky.tools import datalog,aero,geo,TrafficArrays, RegisterElementParameters
 from bluesky.traffic.route import Route
 from bluesky.traffic.performance.legacy.performance import PHASE
 
 # Global data
 afms = None
+header = \
+    "#######################################################\n" + \
+    "AFMS LOG\n" + \
+    "Flight Statistics\n" + \
+    "#######################################################\n\n" + \
+    "Parameters [Units]:\n" + \
+    "Flight Time [s], " + \
+    "Call sign [-], " + \
+    "TAS [m/s], " + \
+    "CAS [m/s], " + \
+    "GS  [m/s], "
+
 
 def init_plugin():
-
-    # Additional initilisation code
-    global afms, acceleration_m_s2, deceleration_m_s2
-    acceleration_m_s2 = 0.5
-    deceleration_m_s2 = -0.5
 
     afms = Afms()
 
@@ -112,9 +119,13 @@ class Afms(TrafficArrays):
         super(Afms, self).__init__()
         # Parameters of afms
         self.dt                                     = 60.0    # [s] frequency of AFMS update
-        self.skip2nwp                               = 300.0   # [s] sw
+        self.thrcontrol                             = 6.0       # [s]
         # Path the route class with some extra default variables to store route information associate to time windows
         patch_route()
+
+        # add a logger that gets updated with every the AFMS
+        self.l = datalog.crelog('afmslog', None, header)
+
 
         with RegisterElementParameters(self):
             self.afmsOn               = np.array([],dtype = np.bool) # AFMS on or off
@@ -177,6 +188,10 @@ class Afms(TrafficArrays):
                 traf.ap.route[idx].iacwprta     = traf.ap.route[idx].rta[0]
                 # remove the active rta from the list
                 traf.ap.route[idx].rta          = traf.ap.route[idx].rta[1:]
+
+                # start the logger here
+                self.l.start()
+                self.l.log(traf.id[idx])
 
                 return True, "AFMS is currently active for  " + traf.id[idx]
 
@@ -245,13 +260,23 @@ class Afms(TrafficArrays):
                     rta = (rtaTime - sim.utc).total_seconds()  # [s]
                     upper_rta = rta + self.twlength[idx]       # [s]
 
+
+                    self.l.log(
+                        np.array(traf.type)[idx],
+                        traf.tas[idx],
+                        traf.cas[idx],
+                        traf.gs[idx],
+                        traf.ap.route[idx].iacwprta,
+                        ETAcurrent, rta, upper_rta)
+
                     # There must be some tolerance between the ETA and RTA to minimize throttle activity.
-                    if    (ETAcurrent - rta) < -6:
-                        cas = self.cas2rta(distto, flightlevels, upper_rta)
+                    if    (ETAcurrent - rta) < - self.thrcontrol:
+                        cas = self.cas2rta(distto, flightlevels, rta)
                         self.spdCmd(idx,cas,flightlevels)
+
                     # if the ETA is higher than the lower bound of the time window request to meet the RTA by slowinf
                     # the aircraft down.
-                    elif  (ETAcurrent - upper_rta) > 6:
+                    elif  (ETAcurrent - upper_rta) > self.thrcontrol:
                         cas = self.cas2rta(distto, flightlevels, upper_rta)
                         self.spdCmd(idx,cas,flightlevels)
                     # if the ETA is width in the time window don't give any speed comands
@@ -292,6 +317,9 @@ class Afms(TrafficArrays):
                 else:
                     stack.stack(f'SPD {traf.id[idx]}, {cas / aero.kts}')
                 stack.stack(f'VNAV {traf.id[idx]} ON')
+
+                self.l.log( np.array(traf.id)[idx], cas,aero.cas2mach(cas, flightlevels[0]),cas / aero.kts)
+
         else:
             pass
 
