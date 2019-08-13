@@ -12,7 +12,7 @@ if __name__ == "__main__":
     logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
     print()
-    print("Initialising BlueSky scenario files and retrieving wind data for the trajectories ... ")
+    print("Initialising BlueSky scenario fil1es and retrieving wind data for the trajectories ... ")
 
     """ load the default settings for the preSimulation BlueSky ( paths where data is stored and where to
     store it after the simulation is run"""
