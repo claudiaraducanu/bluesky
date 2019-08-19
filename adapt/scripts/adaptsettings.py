@@ -48,7 +48,6 @@ def init(cfgfile=''):
     print("Storing trajectory data in                               ", config[config.sections()[0]]["ddr_path"])
     print("Storing raw wind data ( from ECMWF) in .grb format in    ", config[config.sections()[0]]["grib_path"])
     print("Storing wind data in .nc format in                       ", config[config.sections()[0]]["netcdf_path"])
-    print("Storing output of simulations in                         ", config[config.sections()[0]]["output_path"])
     print()
 
     #TODO create the directories if they do not exit

@@ -1,7 +1,7 @@
 """ BlueSky plugin template. The text you put here will be visible
     in BlueSky as the description of your plugin. """
 # Import the global bluesky objects. Uncomment the ones you need
-from bluesky import stack,scr,traf,sim,settings  #, settings, navdb, traf, sim, scr, windtools
+from bluesky import traf, settings,sim  #, settings, navdb, traf, sim, scr, windtools
 from bluesky.tools import datalog, geo, aero, \
     TrafficArrays, RegisterElementParameters
 import numpy as np
@@ -16,7 +16,6 @@ header = \
     "Parameters [Units]:\n" + \
     "Flight Time [s], " + \
     "Call sign [-], " + \
-    "Ensemble Member [-], " + \
     "Forecast time [-], " + \
     "Latitude [deg], " + \
     "Longitude [deg], " + \
@@ -96,7 +95,7 @@ class logWpt(TrafficArrays):
         self.dt     = settings.fms_dt   # [s] frequency of area check (simtime)
 
         # The WPTLOG logger
-        self.logger = datalog.crelog('WPTLOG', None, header)
+        self.logger   = datalog.crelog('WPTLOG', None, header)
 
         with RegisterElementParameters(self):
             self.initial_mass                    = np.array([])
@@ -108,12 +107,15 @@ class logWpt(TrafficArrays):
 
     def log_data(self,idx):
 
+        rtaTime = traf.ap.route[0].wprta[traf.ap.route[0].iacwprta]
         self.logger.log(
-
+            sim.utc.time(),
             np.array(traf.id)[idx],
             np.array(traf.type)[idx],
-            traf.lat[idx],
-            traf.lon[idx],
+            traf.ap.route[0].iactwp,
+            traf.ap.route[0].iacwprta,
+            rtaTime.time(),
+            (rtaTime - sim.utc).total_seconds(),
             traf.alt[idx],
             traf.tas[idx],
             traf.cas[idx],
@@ -126,13 +128,13 @@ class logWpt(TrafficArrays):
         if not self.active:
             pass
         else:
+
             qdr, distinnm = geo.qdrdist(traf.lat, traf.lon,
                                         traf.actwp.lat, traf.actwp.lon)  # [deg][nm])
             dist = distinnm * aero.nm  # Conversion to meters
 
             # aircraft for which way-point will get shifted way-points for aircraft i where necessary
             if len(traf.actwp.Reached(qdr, dist, traf.actwp.flyby)):
-
                 # log flight statistics when for aircraft that switches waypoint
                 self.log_data(traf.actwp.Reached(qdr, dist, traf.actwp.flyby))
 

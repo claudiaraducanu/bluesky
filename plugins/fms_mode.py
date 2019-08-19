@@ -12,18 +12,6 @@ from bluesky.traffic.performance.legacy.performance import PHASE
 
 # Global data
 afms = None
-header = \
-    "#######################################################\n" + \
-    "AFMS LOG\n" + \
-    "Flight Statistics\n" + \
-    "#######################################################\n\n" + \
-    "Parameters [Units]:\n" + \
-    "Flight Time [s], " + \
-    "Call sign [-], " + \
-    "TAS [m/s], " + \
-    "CAS [m/s], " + \
-    "GS  [m/s], "
-
 
 def init_plugin():
 
@@ -118,14 +106,11 @@ class Afms(TrafficArrays):
     def __init__(self):
         super(Afms, self).__init__()
         # Parameters of afms
-        self.dt                                     = 60.0    # [s] frequency of AFMS update
+        self.dt                                     = 30.0      # [s] frequency of AFMS update
         self.thrcontrol                             = 6.0       # [s]
+        self.switchwp                               = 300.0      # [s]
         # Path the route class with some extra default variables to store route information associate to time windows
         patch_route()
-
-        # add a logger that gets updated with every the AFMS
-        self.l = datalog.crelog('afmslog', None, header)
-
 
         with RegisterElementParameters(self):
             self.afmsOn               = np.array([],dtype = np.bool) # AFMS on or off
@@ -189,10 +174,6 @@ class Afms(TrafficArrays):
                 # remove the active rta from the list
                 traf.ap.route[idx].rta          = traf.ap.route[idx].rta[1:]
 
-                # start the logger here
-                self.l.start()
-                self.l.log(traf.id[idx])
-
                 return True, "AFMS is currently active for  " + traf.id[idx]
 
             elif not onoff:
@@ -203,6 +184,7 @@ class Afms(TrafficArrays):
                 return False, "Unknown argument!"
 
     def update(self):
+
         pass
 
     def reset(self):  #
@@ -222,29 +204,40 @@ class Afms(TrafficArrays):
 
                 else:
 
-                    """Calculate the required time of arrival to reach the middle of the time window and the 
+
+                    """ Determine if the active way-point with RTA should still be followed,
+                     or switch to the next way-point """
+
+
+                    """Calculate the ETA at the way-point with rta and the 
                      maximum and minimum required time of arrival based on time window length  """
 
                     """" Estimated time of arrival at the middle of the time window"""
                     # distances between way-points up until the active way-point with RTA
-                    distto         = self.distorta(idx)   # [m]
+                    distto          = self.distorta(idx)  # [m]
+
                     # flight levels at each way-point between current position and the activate way-point with RTA
-                    flightlevels   = self.fl2rta(idx)                # [m]
+                    flightlevels    = self.fl2rta(idx)  # [m]
 
                     """ Determine whether with the current CAS you reach the RTA and time window"""
-                    ETAcurrent = self.eta2rta(traf.cas[idx], distto, flightlevels)  # [s] calculated estimated time of
-                    # arrival
+                    ETAcurrent = self.eta2rta(traf.cas[idx], distto,
+                                              flightlevels)  # [s] calculated estimated time of
 
-                    if ETAcurrent < 1.0 and len(traf.ap.route[idx].rta):
+
+                    # if traf.ap.route[idx].iacwprta < traf.ap.route[idx].iactwp and ETAcurrent < 300:
+                    if ETAcurrent < self.switchwp and len(traf.ap.route[idx].rta):
 
                         # set the current active way-point with RTA to the first element in the way-points with RTA list
                         traf.ap.route[idx].iacwprta = traf.ap.route[idx].rta[0]
                         # remove the active rta from the list
                         traf.ap.route[idx].rta = traf.ap.route[idx].rta[1:]
 
-                        distto          = self.distorta(idx)  # [m]
+                        """" Estimated time of arrival at the middle of the time window"""
+                        # distances between way-points up until the active way-point with RTA
+                        distto = self.distorta(idx)  # [m]
+
                         # flight levels at each way-point between current position and the activate way-point with RTA
-                        flightlevels    = self.fl2rta(idx)  # [m]
+                        flightlevels = self.fl2rta(idx)  # [m]
 
                         """ Determine whether with the current CAS you reach the RTA and time window"""
                         ETAcurrent = self.eta2rta(traf.cas[idx], distto,
@@ -260,32 +253,23 @@ class Afms(TrafficArrays):
                     rta = (rtaTime - sim.utc).total_seconds()  # [s]
                     upper_rta = rta + self.twlength[idx]       # [s]
 
-
-                    self.l.log(
-                        np.array(traf.type)[idx],
-                        traf.tas[idx],
-                        traf.cas[idx],
-                        traf.gs[idx],
-                        traf.ap.route[idx].iacwprta,
-                        ETAcurrent, rta, upper_rta)
-
                     # There must be some tolerance between the ETA and RTA to minimize throttle activity.
                     if    (ETAcurrent - rta) < - self.thrcontrol:
-                        cas = self.cas2rta(distto, flightlevels, rta)
+                        cas = self.cas2rta(distto, flightlevels,  rta)
                         self.spdCmd(idx,cas,flightlevels)
 
                     # if the ETA is higher than the lower bound of the time window request to meet the RTA by slowinf
                     # the aircraft down.
                     elif  (ETAcurrent - upper_rta) > self.thrcontrol:
-                        cas = self.cas2rta(distto, flightlevels, upper_rta)
+                        cas = self.cas2rta(distto, flightlevels,  upper_rta)
                         self.spdCmd(idx,cas,flightlevels)
                     # if the ETA is width in the time window don't give any speed comands
                     else:
-                            pass
+                        pass
 
     def cas2rta(self,distto,flightlevels,rta):
         # Use as first estimate the average TAS required to reach the RTA time.
-
+        #
         TASestimate = np.divide(np.sum(distto), rta)  # initial guess is current speed [m/s]
         CASestimate = aero.tas2cas(TASestimate, flightlevels[0])  # convert TAS to CAS
         eta         = self.eta2rta(CASestimate, distto, flightlevels)  # calculated estimated time of arrival
@@ -318,8 +302,6 @@ class Afms(TrafficArrays):
                     stack.stack(f'SPD {traf.id[idx]}, {cas / aero.kts}')
                 stack.stack(f'VNAV {traf.id[idx]} ON')
 
-                self.l.log( np.array(traf.id)[idx], cas,aero.cas2mach(cas, flightlevels[0]),cas / aero.kts)
-
         else:
             pass
 
@@ -328,13 +310,9 @@ class Afms(TrafficArrays):
         # Assumption is instantaneous climb to next flight level, and instantaneous speed change at new
         # flight level. Calculate the time when flying with the current CAS between way-points up until
         # the active way-point with RTA.
+
         currentCASschedule = np.array([currentCAS] * flightlevels.size)         # [m/s]
         currentTASschedule = aero.vcas2tas(currentCASschedule, flightlevels)    # [m/s]
-
-        # delta_TASspd       = np.ediff1d(currentTASschedule)
-        # need_ax            = np.abs(delta_TASspd) > aero.kts  # small threshold
-        # ax                 = need_ax * np.sign(delta_TASspd) * traf.perf.acceleration()       # [m/s^2]
-        # timetoacc          = np.sum(np.divide(delta_TASspd,ax))                               # [s]
 
         timeto          = np.divide(distto, currentTASschedule)                 # [s]
         estimatedETA    = np.sum(timeto)                                        # [s]

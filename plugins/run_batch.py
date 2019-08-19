@@ -24,22 +24,22 @@ def init_plugin():
         # Update interval in seconds. By default, your plugin's update function(s)
         # are called every timestep of the simulation. If your plugin needs less
         # frequent updates provide an update interval.
-        'update_interval': batch.dt,
+        'update_interval':  batch.dt,
 
         # The update function is called after traffic is updated. Use this if you
         # want to do things as a result of what happens in traffic. If you need to
         # something before traffic is updated please use preupdate.
-        'update':          batch.update,
+        'update':           batch.update,
 
         # The preupdate function is called before traffic is updated. Use this
         # function to provide settings that need to be used by traffic in the current
         # timestep. Examples are ASAS, which can give autopilot commands to resolve
         # a conflict.
-        'preupdate':       batch.preupdate,
+        'preupdate':        batch.preupdate,
 
         # If your plugin has a state, you will probably need a reset function to
         # clear the state in between simulations.
-        'reset':         batch.reset
+        'reset':            batch.reset
         }
 
     stackfunctions = {
@@ -55,7 +55,9 @@ def init_plugin():
             batch.set_batchsim,
 
             # a longer help text of your function.
-            'Print something to the bluesky console based on the flag passed to MYFUN.'],
+            'Simulate the flight plan in the scenario file for each of the 50 weather ensembles. The wind_from'
+            'variable indicates the day before departure from which to get the wind data.'],
+
 
         'BATCHSTART': [
             # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
@@ -69,6 +71,7 @@ def init_plugin():
 
             # a longer help text of your function.
             'Print something to the bluesky console based on the flag passed to MYFUN.'],
+
     }
 
     # init_plugin() should always return these two dicts.
@@ -165,12 +168,10 @@ class Batch(TrafficArrays):
             return True, "SIMBATCH is running scenario file: {}".format(self.current_scn) + \
                          "\nCurrently with wind ensemble member: {}".format(self.current_member)
 
-        # Two arguments are required,
-        if len(args)  == 2:
+        elif len(args)  == 2:
 
             scenarioFile   = args[0] # relative to the scenario
-            # the string provided is a directory and therefore all files
-            # in the directory are analysed.
+
             scenarioFilePath = scenarioFile
 
             date, time, end =   os.path.splitext(scenarioFile)[0].split("_")[-3], \
