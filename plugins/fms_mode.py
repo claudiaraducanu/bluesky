@@ -108,7 +108,7 @@ class Afms(TrafficArrays):
         # Parameters of afms
         self.dt                                     = 30.0      # [s] frequency of AFMS update
         self.thrcontrol                             = 6.0       # [s]
-        self.switchwp                               = 300.0      # [s]
+        self.switchwp                               = 60.0      # [s]
         # Path the route class with some extra default variables to store route information associate to time windows
         patch_route()
 
@@ -174,11 +174,15 @@ class Afms(TrafficArrays):
                 # remove the active rta from the list
                 traf.ap.route[idx].rta          = traf.ap.route[idx].rta[1:]
 
+                self.logger = datalog.crelog('FMSLOG', None, header=" ")
+                self.logger.start()
+
                 return True, "AFMS is currently active for  " + traf.id[idx]
 
             elif not onoff:
                 # add the aircraft to the list of aircraft with advanced fms mode on
                 self.afmsOn[idx] = onoff
+                self.logger.reset()
 
             else:
                 return False, "Unknown argument!"
@@ -199,15 +203,13 @@ class Afms(TrafficArrays):
             afmsIds = np.where(self.afmsOn)[0]
 
             for idx in afmsIds:
+
                 if int(traf.perf.phase[idx]) != PHASE['CR']:
                     pass
 
                 else:
-
-
                     """ Determine if the active way-point with RTA should still be followed,
                      or switch to the next way-point """
-
 
                     """Calculate the ETA at the way-point with rta and the 
                      maximum and minimum required time of arrival based on time window length  """
@@ -222,7 +224,11 @@ class Afms(TrafficArrays):
                     """ Determine whether with the current CAS you reach the RTA and time window"""
                     ETAcurrent = self.eta2rta(traf.cas[idx], distto,
                                               flightlevels)  # [s] calculated estimated time of
-
+                    self.logger.log(sim.utc.time(),
+                                    traf.ap.route[idx].iactwp,
+                                    traf.ap.route[idx].iacwprta,
+                                    ETAcurrent
+                                    )
 
                     # if traf.ap.route[idx].iacwprta < traf.ap.route[idx].iactwp and ETAcurrent < 300:
                     if ETAcurrent < self.switchwp and len(traf.ap.route[idx].rta):
@@ -257,15 +263,37 @@ class Afms(TrafficArrays):
                     if    (ETAcurrent - rta) < - self.thrcontrol:
                         cas = self.cas2rta(distto, flightlevels,  rta)
                         self.spdCmd(idx,cas,flightlevels)
+                        self.logger.log(sim.utc.time(),
+                                        traf.ap.route[idx].iactwp,
+                                        traf.ap.route[idx].iacwprta,
+                                        ETAcurrent,rta,upper_rta,
+                                        (ETAcurrent - rta) < - self.thrcontrol,
+                                        (ETAcurrent - upper_rta) > self.thrcontrol,
+                                        traf.cas[[idx]],cas)
 
                     # if the ETA is higher than the lower bound of the time window request to meet the RTA by slowinf
                     # the aircraft down.
                     elif  (ETAcurrent - upper_rta) > self.thrcontrol:
                         cas = self.cas2rta(distto, flightlevels,  upper_rta)
                         self.spdCmd(idx,cas,flightlevels)
+                        self.logger.log(sim.utc.time(),
+                                        traf.ap.route[idx].iactwp,
+                                        traf.ap.route[idx].iacwprta,
+                                        ETAcurrent,rta,upper_rta,
+                                        (ETAcurrent - rta) < - self.thrcontrol,
+                                        (ETAcurrent - upper_rta) > self.thrcontrol,
+                                        traf.cas[[idx]],cas)
+
                     # if the ETA is width in the time window don't give any speed comands
                     else:
-                        pass
+                        self.logger.log(sim.utc.time(),
+                                        traf.ap.route[idx].iactwp,
+                                        traf.ap.route[idx].iacwprta,
+                                        ETAcurrent,rta,upper_rta,
+                                        (ETAcurrent - rta) < - self.thrcontrol,
+                                        (ETAcurrent - upper_rta) > self.thrcontrol,
+                                        traf.cas[[idx]],0)
+
 
     def cas2rta(self,distto,flightlevels,rta):
         # Use as first estimate the average TAS required to reach the RTA time.
@@ -344,3 +372,5 @@ class Afms(TrafficArrays):
                                        traf.ap.route[idx].iacwprta + 1]), axis=0)
 
         return flightlevels
+
+
