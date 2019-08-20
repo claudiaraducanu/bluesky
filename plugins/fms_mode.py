@@ -224,6 +224,7 @@ class Afms(TrafficArrays):
                     """ Determine whether with the current CAS you reach the RTA and time window"""
                     ETAcurrent = self.eta2rta(traf.cas[idx], distto,
                                               flightlevels)  # [s] calculated estimated time of
+
                     self.logger.log(sim.utc.time(),
                                     traf.ap.route[idx].iactwp,
                                     traf.ap.route[idx].iacwprta,
@@ -256,14 +257,18 @@ class Afms(TrafficArrays):
                     rtaTime = traf.ap.route[idx].wprta[traf.ap.route[idx].iacwprta]  # required time of arrival
 
                     # convert the RTA timestamp to seconds from simulation time
-                    rta = (rtaTime - sim.utc).total_seconds()  # [s]
-                    upper_rta = rta + self.twlength[idx]       # [s]
+                    rta       = max((rtaTime - sim.utc).total_seconds(),0)  # [s]
+
+                    if rta:
+                        upper_rta = (rtaTime - sim.utc).total_seconds() + self.twlength[idx]             # [s]
+                    else:
+                        upper_rta = self.twlength[idx]
 
                     # There must be some tolerance between the ETA and RTA to minimize throttle activity.
                     if    (ETAcurrent - rta) < - self.thrcontrol:
                         cas = self.cas2rta(distto, flightlevels,  rta)
                         self.spdCmd(idx,cas,flightlevels)
-                        self.logger.log(sim.utc.time(),
+                        self.logger.log(sim.utc.time(),rtaTime.time(),
                                         traf.ap.route[idx].iactwp,
                                         traf.ap.route[idx].iacwprta,
                                         ETAcurrent,rta,upper_rta,
@@ -276,7 +281,7 @@ class Afms(TrafficArrays):
                     elif  (ETAcurrent - upper_rta) > self.thrcontrol:
                         cas = self.cas2rta(distto, flightlevels,  upper_rta)
                         self.spdCmd(idx,cas,flightlevels)
-                        self.logger.log(sim.utc.time(),
+                        self.logger.log(sim.utc.time(),rtaTime.time(),
                                         traf.ap.route[idx].iactwp,
                                         traf.ap.route[idx].iacwprta,
                                         ETAcurrent,rta,upper_rta,
@@ -286,7 +291,7 @@ class Afms(TrafficArrays):
 
                     # if the ETA is width in the time window don't give any speed comands
                     else:
-                        self.logger.log(sim.utc.time(),
+                        self.logger.log(sim.utc.time(),rtaTime.time(),
                                         traf.ap.route[idx].iactwp,
                                         traf.ap.route[idx].iacwprta,
                                         ETAcurrent,rta,upper_rta,
