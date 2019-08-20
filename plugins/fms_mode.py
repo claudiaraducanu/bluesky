@@ -1,17 +1,31 @@
 """ Flight Management System Mode plugin """
 # Import the global bluesky objects. Uncomment the ones you need
-from datetime import date, datetime, time, timedelta
+from datetime import datetime
 from plugins.patch_route import patch_route
 # from math import sqrt
 import numpy as np
 
-from bluesky import sim, stack, traf, tools  #, settings, navdb, sim, scr, tools
+from bluesky import sim, stack, traf
 from bluesky.tools import datalog,aero,geo,TrafficArrays, RegisterElementParameters
-from bluesky.traffic.route import Route
 from bluesky.traffic.performance.legacy.performance import PHASE
 
 # Global data
 afms = None
+header = \
+    "#######################################################\n" + \
+    "FMS LOG\n" + \
+    "Flight Statistics\n" + \
+    "#######################################################\n\n" + \
+    "Parameters [Units]:\n" + \
+    "simulation time [s], flight time, " + \
+    "active waypoint, " + \
+    "active rta waypoint, " + \
+    "eta [s] \n" + \
+    "simulation time [s], flight time, rta time, " + \
+    "active waypoint, " + \
+    "active rta waypoint, " + \
+    "eta [s], rta [s], latest rta [s], left_out, right_out," + \
+    "gs [m/s], tas[m/s], cas[m/s], new cas [m/s] "
 
 def init_plugin():
 
@@ -274,7 +288,10 @@ class Afms(TrafficArrays):
                                         ETAcurrent,rta,upper_rta,
                                         (ETAcurrent - rta) < - self.thrcontrol,
                                         (ETAcurrent - upper_rta) > self.thrcontrol,
-                                        traf.cas[[idx]],cas)
+                                        traf.gs[[idx]],
+                                        traf.tas[[idx]],
+                                        traf.cas[[idx]],
+                                        cas)
 
                     # if the ETA is higher than the lower bound of the time window request to meet the RTA by slowinf
                     # the aircraft down.
@@ -287,6 +304,8 @@ class Afms(TrafficArrays):
                                         ETAcurrent,rta,upper_rta,
                                         (ETAcurrent - rta) < - self.thrcontrol,
                                         (ETAcurrent - upper_rta) > self.thrcontrol,
+                                        traf.gs[[idx]],
+                                        traf.tas[[idx]],
                                         traf.cas[[idx]],cas)
 
                     # if the ETA is width in the time window don't give any speed comands
@@ -297,6 +316,8 @@ class Afms(TrafficArrays):
                                         ETAcurrent,rta,upper_rta,
                                         (ETAcurrent - rta) < - self.thrcontrol,
                                         (ETAcurrent - upper_rta) > self.thrcontrol,
+                                        traf.gs[[idx]],
+                                        traf.tas[[idx]],
                                         traf.cas[[idx]],0)
 
 

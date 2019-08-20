@@ -14,17 +14,19 @@ header = \
     "Flight Statistics\n" + \
     "#######################################################\n\n" + \
     "Parameters [Units]:\n" + \
-    "Flight Time [s], " + \
-    "Call sign [-], " + \
-    "Forecast time [-], " + \
-    "Latitude [deg], " + \
-    "Longitude [deg], " + \
-    "Altitude [m], " + \
-    "TAS [m/s], " + \
-    "CAS [m/s], " + \
-    "GS  [m/s], " + \
-    "Fuel Mass [kg], " + \
-    "Mass [kg], "
+    "simulation time [s], " + \
+    "flight  time, " + \
+    "rta time, " + \
+    "ens member, " + \
+    "aircraft type, " + \
+    "active waypoint, " + \
+    "active rta waypoint, " + \
+    "altitude[m], " + \
+    "tas [m/s], " + \
+    "cas [m/s], " + \
+    "gs  [m/s], " + \
+    "fuel mass [kg], " + \
+    "mass [kg], "
 
 ### Initialization function of your plugin. Do not change the name of this
 ### function, as it is the way BlueSky recognises this file as a plugin.
@@ -109,13 +111,13 @@ class logWpt(TrafficArrays):
 
         rtaTime = traf.ap.route[0].wprta[traf.ap.route[0].iacwprta]
         self.logger.log(
+
             sim.utc.time(),
-            np.array(traf.id)[idx],
+            traf.wind.current_ensemble,
             np.array(traf.type)[idx],
             traf.ap.route[0].iactwp,
             traf.ap.route[0].iacwprta,
             rtaTime.time(),
-            (rtaTime - sim.utc).total_seconds(),
             traf.alt[idx],
             traf.tas[idx],
             traf.cas[idx],

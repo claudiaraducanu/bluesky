@@ -2,9 +2,7 @@ from bluesky import settings,stack, traf, sim
 from bluesky.tools import TrafficArrays,RegisterElementParameters,\
                         aero,geo
 import os
-import datetime
 import glob
-import numpy as np
 
 # Initialization function of your plugin. Do not change the name of this
 # function, as it is the way BlueSky recognises this file as a plugin.
