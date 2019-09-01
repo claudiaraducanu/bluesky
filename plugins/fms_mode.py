@@ -248,7 +248,7 @@ class Afms(TrafficArrays):
                     # if traf.ap.route[idx].iacwprta < traf.ap.route[idx].iactwp and ETAcurrent < 300:
                     if ETAcurrent < self.switchwp and len(traf.ap.route[idx].rta):
 
-                        # set the current active way-point with RTA to the first element in the way-points with RTA list
+                        # earli
                         traf.ap.route[idx].iacwprta = traf.ap.route[idx].rta[0]
                         # remove the active rta from the list
                         traf.ap.route[idx].rta = traf.ap.route[idx].rta[1:]

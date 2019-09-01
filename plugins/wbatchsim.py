@@ -90,10 +90,7 @@ class Batch(TrafficArrays):
         self.current_nc      = 0
         self.current_member  = 1
 
-        # Parameters of the datalogger
-        self.active = False
-        self.dt     = 1.0    # [s] frequency of area check (simtime)
-        self.logType = "WPTLOG"
+        self.dt     = settings.simdt   # [s] (simtime)
 
     def update(self):
 
@@ -102,21 +99,6 @@ class Batch(TrafficArrays):
             pass
 
         else:
-
-            if self.logType == "WINDLOG":
-
-                qdr, distinnm = geo.qdrdist(traf.lat, traf.lon,
-                                            traf.actwp.lat, traf.actwp.lon)  # [deg][nm])
-                dist = distinnm * aero.nm  # Conversion to meters
-
-                # aircraft for which way-point will get shifted way-points for aircraft i where necessary
-                if len(traf.actwp.Reached(qdr, dist, traf.actwp.flyby)):
-
-                    # log flight statistics when for aircraft that switches waypoint
-                    for idx in traf.actwp.Reached(qdr, dist, traf.actwp.flyby):
-                        if traf.ap.route[idx].iactwp == traf.ap.route[idx].nwp - 1:
-                            # delete all aicraft in self.delidx
-                            traf.delete(idx)
 
             if len(traf.id) == 0:
                 stack.stack("HOLD")
@@ -168,19 +150,20 @@ class Batch(TrafficArrays):
 
         elif len(args)  == 2:
 
-            scenarioFile   = args[0] # relative to the scenario
+            scenarioFile        = args[0].lower() # relative to the scenario
+            daybeforeDeparture  = args[1]
 
-            scenarioFilePath = scenarioFile
+            date, forecast_time, last_analysis_time =    os.path.splitext(scenarioFile)[0].split("_")[-3], \
+                                                        os.path.splitext(scenarioFile)[0].split("_")[-2], \
+                                                    os.path.splitext(scenarioFile)[0].split("_")[-1]
 
-            date, time, end =   os.path.splitext(scenarioFile)[0].split("_")[-3], \
-                                os.path.splitext(scenarioFile)[0].split("_")[-2], \
-                                os.path.splitext(scenarioFile)[0].split("_")[-1]
+            netcdfFile      = glob.glob(settings.wind_path + \
+                                       '/ecmwf_pl_{}_{}*{}.nc'.format(date,forecast_time,
+                                                                      daybeforeDeparture*24+int(last_analysis_time)),
+                                        recursive=True)
 
-            netcdfFilePath = glob.glob("adapt/input/netcdf" + '/ecmwf_pl_{}_{}*{}.nc'.
-                                       format(date,time,args[1]*24+int(end)), recursive=True)
-
-            self.ic.append(scenarioFilePath)
-            self.nc.append(netcdfFilePath)
+            self.ic.append(scenarioFile)
+            self.nc.append(netcdfFile)
 
         else:
 

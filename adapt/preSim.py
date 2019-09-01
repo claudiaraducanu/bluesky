@@ -76,6 +76,7 @@ if __name__ == "__main__":
     """ Loop through the DDR trajectories to create scn files"""
 
     coefficient.init(bada_path=paths["bada_path"])
+    casCr2  = []
 
     for root,dirs,files in os.walk(paths["ddr_path"]):
 
@@ -92,6 +93,8 @@ if __name__ == "__main__":
                     cascr = coeff.CAScr2[0]
                     mcr   = coeff.Mcr[0]
 
+                    casCr2.append([scenario.acid,scenario.ac_type,cascr,mcr])
+
                     scenario.tw_deterministic   = trajectory_list.loc[scenario.acid]["deterministic"]['TW']
                     scenario.tw_probabilistic   = trajectory_list.loc[scenario.acid]["probabilistic"]['TW']
 
@@ -103,15 +106,15 @@ if __name__ == "__main__":
                     # where the default is 4 consisting of 1min,60min the probabilistic and the deterministic. If the
                     # probabilistic and deterministic time windows are equal create only the deterministic scenario.
 
-                    twWidths = { '01': 1, '60': 60, 'deterministic':  int(scenario.tw_deterministic)}
+                    twWidths = { '01': 1, '60': 60, '15': 15, 'deterministic':  int(scenario.tw_deterministic)}
 
                     if twWidths["deterministic"] != int(scenario.tw_probabilistic):
                          twWidths['probabilistic'] = int(scenario.tw_probabilistic)
 
                     for key in twWidths:
 
-                        if key == "60":
-                            rtaWpts = [0,scenario.data.index[-1]]
+                        if key == "60" or key=="15":
+                            rtaWpts = [scenario.data.index[-1]]
 
                         else:
 
@@ -140,6 +143,7 @@ if __name__ == "__main__":
                                 else:
                                     currentwp = scenario.data.index[-1]
 
+
                                 rtaWpts.append(currentwp)
 
                         scnfilename = ".".join(["_".join([key,
@@ -163,4 +167,12 @@ if __name__ == "__main__":
                             scnfile.write(scenario.start_log(log_type=logType))
                             scnfile.write(scenario.start_simulation())
 
+        casCr2 = pd.DataFrame(casCr2,columns=["acid","ac type","preferred cruise velocity","preferred cruise M"])
+        casCr2 = casCr2.sort_values(by=['acid'])
+        casCr2 = casCr2.set_index('acid')
 
+        # save to excel
+        with pd.ExcelWriter("aircraft-preffered-velocity.xlsx") as writer:
+            for n, df in enumerate([casCr2]):
+                df.to_excel(writer, 'sheet%s' % n)
+            writer.save()
