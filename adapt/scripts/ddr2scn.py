@@ -112,26 +112,15 @@ class parseDDR():
 
         return v_cas,hdg
 
-    def cre(self,mcr,cascr):
+    def cre(self,cascr):
         """
         Include BlueSky CRE stack command, that creates the aircraft
         :return: string of CRE stack command
         """
 
         _,hdg = self._avg_spd(self.data.iloc[0],self.data.iloc[1])
-        h_transition = aero.crossoveralt(cascr*aero.kts,mcr)
-        h_current    = int(str(self.data.iloc[0].fl) + "00")* aero.ft
 
-        if h_current > h_transition:
-
-            return '00:00:00.00>CRE ' + ", ".join([self.acid, self.ac_type,
-                                                 str(self.data.iloc[0].x_coord),
-                                                 str(self.data.iloc[0].y_coord),
-                                                 str(hdg),
-                                                 str(self.data.iloc[0].fl) + "00",
-                                                str(mcr) + "\n"])
-        else:
-            return '00:00:00.00>CRE ' + ", ".join([self.acid, self.ac_type,
+        return '00:00:00.00>CRE ' + ", ".join([self.acid, self.ac_type,
                                                str(self.data.iloc[0].x_coord),
                                                str(self.data.iloc[0].y_coord),
                                                str(hdg),
@@ -146,40 +135,23 @@ class parseDDR():
         :return: string of VNAV,LNAV,op,ff stack commands
         """
 
-        return "0:00:00.00>lnav {} ON \n0:00:00.00>vnav {} ON \n00:00:00.00>op \n00:00:01.00>ff\n".\
-            format(self.acid, self.acid)
+        return "0:00:00.00>lnav {} ON \n" \
+               "0:00:00.00>vnav {} ON \n" \
+               "00:00:00.00>op \n" \
+               "00:00:01.00>ff\n".format(self.acid, self.acid)
 
-    def start_log(self,log_type):
-        """
 
-        :param log_type: select way in which to log information and give appropriate stack command
-        :param period: if log_type is periodic, the select period between logging information
-        :param varaibles: string of variables to log data
-        :return:
-        """
-
-        if log_type == "windlog":
-
-            return "0:00:00.00>CRELOG WINDLOG 1.0\n"  \
-                   "0:00:00.00>WINDLOG ADD traf.id,traf.wind.current_ensemble,traf.wind.hours_before_departure," \
-                   "traf.gsnorth,traf.gseast,traf.gs,traf.tas,traf.cas,traf.trk,traf.hdg\n"  \
-                "0:00:00.00>WINDLOG ON\n"
-
-        elif log_type == 'wptlog':
-
-            return  "0:00:00.00>WPTLOG ON\n"
-
-    def get_route(self):
-
-        return "0:00:00.00>DUMPRTE {}\n".format(self.acid)
-
-    def initialise_simulation(self):
+    def initialise_simulation(self,delay):
 
         """
         Include HOLD, DATE stack command.
         :return: string of HOLD, DATE stack commands
         """
-        return "00:00:00.00>hold \n00:00:00.00>date {}\n".format(self.date_start.strftime("%d %m %Y %H:%M:%S.00"))
+
+        departure_time = self.date_start + datetime.timedelta(minutes = delay)
+
+        return "00:00:00.00>hold \n" \
+               "00:00:00.00>date {}\n".format(departure_time.strftime("%d %m %Y %H:%M:%S.00"))
 
 
     def defwpt_command(self):
@@ -200,7 +172,7 @@ class parseDDR():
 
         return "".join(all_defwpt)
 
-    def addwpt_command(self,with_spd=True):
+    def addwpt_command(self):
         """
         Defines the sequence of way-points, for the BlueSKy FMS, that the aircraft must follow.
         :return:
@@ -210,25 +182,53 @@ class parseDDR():
 
         for idx in range(0, self.data.index.size):
 
-            if with_spd:
-                spd, hdg = self._avg_spd(self.data.iloc[idx-1], self.data.iloc[idx])
-
-                wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
-                                                       'FL{}'.format(str(self.data.iloc[idx].fl)),
-                                                       '{}'.format( str(int(spd))) + "\n"])
-            else:
-                wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
+            wpt = '0:00:00.00>addwpt ' + ",".join(['{},wpt_{}'.format(self.acid,idx),
                                                        'FL{}'.format(str(self.data.iloc[idx].fl) + "\n")])
             all_after.append(wpt)
 
         return "".join(all_after)
 
-    def rta_commands(self,wptList):
+    def rta_commands(self,tw_type,wp_freq,delay):
+
+        if tw_type == "60" or  tw_type == "15":
+
+            rtaWpts = [self.data.index[-1]]
+
+        else:
+
+            # define the way-points that have an RTA constraint. Start out with the first way-point
+            # such that the AFMS is activated and then continue such that there is a waypoint
+            # with an RTA at least wp_frequency seconds (set in adaptsettings.cfg) away from the last
+            # waypoint with an RTA.
+
+            rtaWpts = []  # list of way-points that have an RTA constraint
+
+            current_wp   = 0                    # start from first way-point
+            current_time = self.date_start
+
+            # as long as there are way-points
+            while current_wp < self.data.index[-1]:
+
+                # calculate the number of seconds from current way-point to all the other way-points left in
+                # the trajectory
+                wp_timedelta = (self.data['time_over'][current_wp + 1:] - current_time).dt.total_seconds()
+                wp_timedelta = wp_timedelta[wp_timedelta > int(wp_freq)]
+
+                if not wp_timedelta.size:
+                    current_wp   = self.data.index[-1]
+                else:
+                    current_wp = wp_timedelta.index[0]
+                    current_time = self.data['time_over'][current_wp]
+                    rtaWpts.append(current_wp)
+
+        rtaTimes                = self.data['time_over'].iloc[rtaWpts]
+        departureTime           = self.date_start + datetime.timedelta(minutes = delay)
+        wp_afterdeparturetime   = (rtaTimes - departureTime).dt.total_seconds() > 0
+        rtaWpts                 = list(rtaTimes[wp_afterdeparturetime].index)
 
         cmdrtas     = []
-        cmdafmss     = []
 
-        for wpt in wptList:
+        for wpt in rtaWpts:
 
             # set the required arrival time at a way-point to be DDR time over
             rtatime = self.data.loc[wpt].time_over.strftime("%d %m %Y %H:%M:%S.00")
@@ -240,17 +240,3 @@ class parseDDR():
 
         return "".join(cmdrtas)
 
-    def tw_command(self,twSize):
-
-
-        # TW_SIZE_AT
-        cmdtw =  "0:00:00.00>TW {} ".format(self.acid) + str(twSize*60) + "\n"
-
-        return  cmdtw
-
-    def afms_command(self):
-
-        # TW_SIZE_AT
-        cmdafms =  "0:00:00.00>AFMS {} ".format(self.acid) + "ON\n"
-
-        return  cmdafms

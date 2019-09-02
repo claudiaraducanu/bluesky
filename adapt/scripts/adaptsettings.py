@@ -30,9 +30,9 @@ def init(cfgfile=''):
         config.set('path', 'netcdf_path', os.path.join(rundir, 'input/netcdf'))
         config.set('path', 'grib_path', os.path.join(rundir, 'input/grib'))
         config.set('path', 'output_path', 'output')
-        config.set('path', 'xlsx_path', 'output/xlsxFiles')
         config.set('path', 'bluesky_path', bluskydir)
         config.set('path', 'scn_path',  os.path.join(bluskydir,'scenario'))
+        config.set('path', 'bada_path',  os.path.join(bluskydir,"data/performance/BADA"))
 
         # afms mode settings
         config.add_section('afms')
@@ -43,6 +43,7 @@ def init(cfgfile=''):
             config.write(configfile)
 
     config.read(cfgfile)
+
 
     print()
     print("Storing trajectory data in                               ", config[config.sections()[0]]["ddr_path"])

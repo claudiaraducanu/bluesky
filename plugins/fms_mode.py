@@ -1,6 +1,6 @@
 """ Flight Management System Mode plugin """
 # Import the global bluesky objects. Uncomment the ones you need
-from datetime import datetime
+import  datetime
 from plugins.patch_route import patch_route
 # from math import sqrt
 import numpy as np
@@ -128,12 +128,13 @@ class Afms(TrafficArrays):
 
         with RegisterElementParameters(self):
             self.afmsOn               = np.array([],dtype = np.bool) # AFMS on or off
-            self.twlength             = np.array([])
+            self.twLength             = np.array([])
+
 
     def create(self, n=1):
         super(Afms, self).create(n)
         self.afmsOn[-n:]      = False
-        self.twlength[-n:]    = 0
+        self.twLength[-n:]    = 0
 
     def set_rta(self,*args):
 
@@ -147,7 +148,7 @@ class Afms(TrafficArrays):
             if name in traf.ap.route[idx].wpname:
 
                 wpidx = traf.ap.route[idx].wpname.index(name)
-                traf.ap.route[idx].wprta[wpidx] = datetime.strptime(
+                traf.ap.route[idx].wprta[wpidx] = datetime.datetime.strptime(
                                                     f'{year},{month},{day},{wprtatime}',
                                                     '%Y,%m,%d,%H:%M:%S.%f' if '.' in wprtatime else
                                                     '%Y,%m,%d,%H:%M:%S')
@@ -165,7 +166,7 @@ class Afms(TrafficArrays):
         else:
             idx,tw_size = args[0],args[1]
 
-            self.twlength[idx] = tw_size
+            self.twLength[idx] = tw_size
 
             return True, traf.id[idx] + " time window length set for " + str(tw_size) + " seconds"
 
@@ -220,125 +221,133 @@ class Afms(TrafficArrays):
 
                 if int(traf.perf.phase[idx]) != PHASE['CR']:
                     pass
-
                 else:
-                    """ Determine if the active way-point with RTA should still be followed,
-                     or switch to the next way-point """
 
-                    """Calculate the ETA at the way-point with rta and the 
-                     maximum and minimum required time of arrival based on time window length  """
+                    """Define time window at current active way-point with time constraint"""
+                    rta, latest_rta = self.defineTW(idx)
 
-                    """" Estimated time of arrival at the middle of the time window"""
-                    # distances between way-points up until the active way-point with RTA
-                    distto          = self.distorta(idx)  # [m]
+                    if (traf.ap.route[idx].iacwprta < traf.ap.route[idx].iactwp or latest_rta < 0) \
+                        and  len(traf.ap.route[idx].rta):
 
-                    # flight levels at each way-point between current position and the activate way-point with RTA
-                    flightlevels    = self.fl2rta(idx)  # [m]
+                            # switch to next way-point with time constraint
+                            traf.ap.route[idx].iacwprta = traf.ap.route[idx].rta[0]
+                            # remove the active rta from the list
+                            traf.ap.route[idx].rta = traf.ap.route[idx].rta[1:]
 
-                    """ Determine whether with the current CAS you reach the RTA and time window"""
-                    ETAcurrent = self.eta2rta(traf.cas[idx], distto,
-                                              flightlevels)  # [s] calculated estimated time of
+                            # vertical (flight levels at each way-point) and lateral ( distance between way-points) dimensions
+                            # to the active way-point with time constraint
+                            dist2rta, fl2rta = self.dimensions2rta(idx)
+                            # Final ETA calculation
+                            eta = self.eta2rta(traf.cas[idx], dist2rta, fl2rta)
 
-                    self.logger.log(sim.utc.time(),
-                                    traf.ap.route[idx].iactwp,
-                                    traf.ap.route[idx].iacwprta,
-                                    ETAcurrent
-                                    )
+                            """Define time window at current active way-point with time constraint"""
+                            rta, latest_rta = self.defineTW(idx)
+                            self.adhrenceTW(idx, eta, rta, latest_rta, dist2rta, fl2rta)
 
-                    # if traf.ap.route[idx].iacwprta < traf.ap.route[idx].iactwp and ETAcurrent < 300:
-                    if ETAcurrent < self.switchwp and len(traf.ap.route[idx].rta):
-
-                        # earli
-                        traf.ap.route[idx].iacwprta = traf.ap.route[idx].rta[0]
-                        # remove the active rta from the list
-                        traf.ap.route[idx].rta = traf.ap.route[idx].rta[1:]
-
-                        """" Estimated time of arrival at the middle of the time window"""
-                        # distances between way-points up until the active way-point with RTA
-                        distto = self.distorta(idx)  # [m]
-
-                        # flight levels at each way-point between current position and the activate way-point with RTA
-                        flightlevels = self.fl2rta(idx)  # [m]
-
-                        """ Determine whether with the current CAS you reach the RTA and time window"""
-                        ETAcurrent = self.eta2rta(traf.cas[idx], distto,
-                                                  flightlevels)  # [s] calculated estimated time of
-
-                    else:
+                    elif (traf.ap.route[idx].iacwprta < traf.ap.route[idx].iactwp or latest_rta < 0) \
+                        and not len(traf.ap.route[idx].rta):
                         pass
 
-                    # get the RTA at the current way-point with RTA constraint
-                    rtaTime = traf.ap.route[idx].wprta[traf.ap.route[idx].iacwprta]  # required time of arrival
-
-                    # convert the RTA timestamp to seconds from simulation time
-                    rta       = max((rtaTime - sim.utc).total_seconds(),0)  # [s]
-
-                    if rta:
-                        upper_rta = (rtaTime - sim.utc).total_seconds() + self.twlength[idx]             # [s]
                     else:
-                        upper_rta = self.twlength[idx]
-
-                    # There must be some tolerance between the ETA and RTA to minimize throttle activity.
-                    if    (ETAcurrent - rta) < - self.thrcontrol:
-                        cas = self.cas2rta(distto, flightlevels,  rta)
-                        self.spdCmd(idx,cas,flightlevels)
-                        self.logger.log(sim.utc.time(),rtaTime.time(),
-                                        traf.ap.route[idx].iactwp,
-                                        traf.ap.route[idx].iacwprta,
-                                        ETAcurrent,rta,upper_rta,
-                                        (ETAcurrent - rta) < - self.thrcontrol,
-                                        (ETAcurrent - upper_rta) > self.thrcontrol,
-                                        traf.gs[[idx]],
-                                        traf.tas[[idx]],
-                                        traf.cas[[idx]],
-                                        cas)
-
-                    # if the ETA is higher than the lower bound of the time window request to meet the RTA by slowinf
-                    # the aircraft down.
-                    elif  (ETAcurrent - upper_rta) > self.thrcontrol:
-                        cas = self.cas2rta(distto, flightlevels,  upper_rta)
-                        self.spdCmd(idx,cas,flightlevels)
-                        self.logger.log(sim.utc.time(),rtaTime.time(),
-                                        traf.ap.route[idx].iactwp,
-                                        traf.ap.route[idx].iacwprta,
-                                        ETAcurrent,rta,upper_rta,
-                                        (ETAcurrent - rta) < - self.thrcontrol,
-                                        (ETAcurrent - upper_rta) > self.thrcontrol,
-                                        traf.gs[[idx]],
-                                        traf.tas[[idx]],
-                                        traf.cas[[idx]],cas)
-
-                    # if the ETA is width in the time window don't give any speed comands
-                    else:
-                        self.logger.log(sim.utc.time(),rtaTime.time(),
-                                        traf.ap.route[idx].iactwp,
-                                        traf.ap.route[idx].iacwprta,
-                                        ETAcurrent,rta,upper_rta,
-                                        (ETAcurrent - rta) < - self.thrcontrol,
-                                        (ETAcurrent - upper_rta) > self.thrcontrol,
-                                        traf.gs[[idx]],
-                                        traf.tas[[idx]],
-                                        traf.cas[[idx]],0)
+                        """
+                        Compute estimated time of arrival (ETA) at the current active way-point with RTA constraint
+                        wth the current calibrated airspeed (CAS)
+                        """
+                        # vertical (flight levels at each way-point) and lateral ( distance between way-points) dimensions
+                        # to the active way-point with time constraint
+                        dist2rta, fl2rta  = self.dimensions2rta(idx)
+                        # Final ETA calculation
+                        eta = self.eta2rta(traf.cas[idx],dist2rta,fl2rta)
+                        self.adhrenceTW(idx,eta,rta,latest_rta,dist2rta,fl2rta)
 
 
-    def cas2rta(self,distto,flightlevels,rta):
+    def adhrenceTW(self,idx,eta,rta, latest_rta,dist2rta,fl2rta):
+
+        # There must be some tolerance between the ETA and RTA to minimize throttle activity.
+        if (eta - rta) < - self.thrcontrol:
+            cas = self.cas2rta(rta,dist2rta,fl2rta)
+            self.spdCmd(idx, cas, fl2rta)
+            self.log_data(idx,eta, rta, latest_rta, cas)
+
+        # if the ETA is higher than the lower bound of the time window request to meet the RTA by slowinf
+        # the aircraft down.
+        elif (eta - latest_rta) > self.thrcontrol:
+            cas = self.cas2rta(latest_rta,dist2rta,fl2rta)
+            self.spdCmd(idx, cas, fl2rta)
+            self.log_data(idx,eta, rta, latest_rta, cas)
+        # if the ETA is width in the time window don't give any speed comands
+        else:
+            self.log_data(idx, eta, rta, latest_rta, 0)
+
+    def defineTW(self,idx):
+
+        # get the RTA at the current way-point with RTA constraint
+        rta_timestamp = traf.ap.route[idx].wprta[traf.ap.route[idx].iacwprta]  # required time of arrival
+
+        # convert the RTA timestamp to seconds from simulation time
+        rta         = max((rta_timestamp - sim.utc).total_seconds(), 0)  # [s]
+        latest_rta  = (rta_timestamp - sim.utc).total_seconds() + self.twLength[idx]  # [s]
+
+        return rta,latest_rta
+
+    def cas2rta(self,rta,dist2rta,fl2rta):
         # Use as first estimate the average TAS required to reach the RTA time.
-        #
-        TASestimate = np.divide(np.sum(distto), rta)  # initial guess is current speed [m/s]
-        CASestimate = aero.tas2cas(TASestimate, flightlevels[0])  # convert TAS to CAS
-        eta         = self.eta2rta(CASestimate, distto, flightlevels)  # calculated estimated time of arrival
+
+        tas_estimate = np.divide(np.sum(dist2rta), rta)  # initial guess is current speed [m/s]
+        cas_estimate = aero.tas2cas(tas_estimate, fl2rta[0])  # convert TAS to CAS
+        eta          = self.eta2rta(cas_estimate,dist2rta,fl2rta)  # calculated estimated time of arrival
 
         while abs(eta - rta) > 0.1:
-            prevTASestimate = TASestimate
+
+            prevTASestimate = tas_estimate
             # the TAS to reach the RTA is the same as flying
-            TASestimate = eta * prevTASestimate / rta
+            tas_estimate = eta * prevTASestimate / rta
 
-            CASestimate = aero.tas2cas(TASestimate, flightlevels[0])
-            eta         = self.eta2rta(CASestimate, distto, flightlevels)
+            cas_estimate = aero.tas2cas(tas_estimate, fl2rta[0])
+            eta          = self.eta2rta(cas_estimate,dist2rta,fl2rta)
 
-        return CASestimate
+        return cas_estimate
 
-    def spdCmd(self, idx, cas, flightlevels):
+
+    @staticmethod
+    def eta2rta(cas,dist2rta,fl2rta):
+        # Assumption is instantaneous climb to next flight level, and instantaneous speed change at new
+        # flight level. Calculate the time when flying with the current CAS between way-points up until
+        # the active way-point with RTA.
+
+        cas_schedule = np.array([cas] * fl2rta.size)          # [m/s]
+        tas_schedule = aero.vcas2tas(cas_schedule, fl2rta)    # [m/s]
+
+        time2rta        = np.divide(dist2rta, tas_schedule)         # [s]
+        eta             = np.sum(time2rta)                          # [s]
+
+        return eta
+
+    @staticmethod
+    def dimensions2rta(idx):
+
+        # calcualte the distance from current postion to the active way-point
+        _, dist2nextwp = geo.qdrdist(traf.lat[idx], traf.lon[idx],
+                                     traf.ap.route[idx].wplat[traf.ap.route[idx].iactwp],
+                                     traf.ap.route[idx].wplon[traf.ap.route[idx].iactwp])  # [nm]
+
+        # distances between way-points up until the active way-point with time constraint
+        dist2rta = np.concatenate((np.array([dist2nextwp]),
+                                 traf.ap.route[idx].wpdistto[
+                                 traf.ap.route[idx].iactwp + 1:
+                                 traf.ap.route[idx].iacwprta + 1]), axis=0) * aero.nm  # [m]
+
+        # flight levels at each way-point between current position and the activate way-point with RTA. Assume
+        # instantaneous flight level change.
+        fl2rta = np.concatenate((np.array([traf.alt[idx]]),
+                                       traf.ap.route[idx].wpalt[
+                                       traf.ap.route[idx].iactwp + 1:
+                                       traf.ap.route[idx].iacwprta + 1]), axis=0)
+
+        return dist2rta,fl2rta
+
+    @staticmethod
+    def spdCmd(idx, cas, flightlevels):
         # Function to change the speed of the aircraft
 
         if abs(traf.cas[idx] - cas) > aero.kts:  # Don't give very small speed changes
@@ -359,44 +368,17 @@ class Afms(TrafficArrays):
         else:
             pass
 
-    @staticmethod
-    def eta2rta(currentCAS,distto,flightlevels):
-        # Assumption is instantaneous climb to next flight level, and instantaneous speed change at new
-        # flight level. Calculate the time when flying with the current CAS between way-points up until
-        # the active way-point with RTA.
+    def log_data(self,idx,eta,rta,latest_rta,cas):
 
-        currentCASschedule = np.array([currentCAS] * flightlevels.size)         # [m/s]
-        currentTASschedule = aero.vcas2tas(currentCASschedule, flightlevels)    # [m/s]
-
-        timeto          = np.divide(distto, currentTASschedule)                 # [s]
-        estimatedETA    = np.sum(timeto)                                        # [s]
-
-        return estimatedETA
-
-    @staticmethod
-    def distorta(idx):
-        # calcualte the distance from current postion to the active way-point
-        _, dist2nextwp = geo.qdrdist(traf.lat[idx], traf.lon[idx],
-                                     traf.ap.route[idx].wplat[traf.ap.route[idx].iactwp],
-                                     traf.ap.route[idx].wplon[traf.ap.route[idx].iactwp])  # [nm]
-
-        # distances between way-points up until the active way-point with RTA
-        distto = np.concatenate((np.array([dist2nextwp]),
-                                 traf.ap.route[idx].wpdistto[
-                                 traf.ap.route[idx].iactwp + 1:
-                                 traf.ap.route[idx].iacwprta + 1]), axis=0) * aero.nm  # [m]
-
-        return distto
-
-    @staticmethod
-    def fl2rta(idx):
-        # flight levels at each way-point between current position and the activate way-point with RTA. Assume
-        # instantaneous flight level change. 
-        flightlevels = np.concatenate((np.array([traf.alt[idx]]),
-                                       traf.ap.route[idx].wpalt[
-                                       traf.ap.route[idx].iactwp + 1:
-                                       traf.ap.route[idx].iacwprta + 1]), axis=0)
-
-        return flightlevels
-
+        self.logger.log(sim.utc.time(),
+                        (traf.ap.route[idx].wprta[traf.ap.route[idx].iacwprta]).time(),
+                        traf.ap.route[idx].iactwp,
+                        traf.ap.route[idx].iacwprta,
+                        eta,
+                        rta,
+                        latest_rta,
+                        (eta - rta) < - self.thrcontrol,
+                        (eta - latest_rta) > self.thrcontrol,
+                        traf.cas[[idx]],
+                        cas)
 
