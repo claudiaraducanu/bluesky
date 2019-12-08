@@ -565,7 +565,7 @@ def init(startup_scnfile):
         #     "METRIC OFF/0/1/2, [dt]",
         #     "onoff/int,[float]",
         #     bs.sim.metric.toggle,
-        #     "Complexity metrics module"
+        #     "Complexity xlsx module"
         # ],
         "MOVE": [
             "MOVE acid,lat,lon,[alt,hdg,spd,vspd]",

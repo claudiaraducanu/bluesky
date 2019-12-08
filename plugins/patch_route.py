@@ -9,11 +9,10 @@ def patch_route():
         old_route_init(self, *k, **kw)
 
         self.wprta  = []        # [s] required time of arrival at way-point
-        self.wptw   = []       # [s] time window size around RTA
+        self.wptw   = []        # [s] time window size around RTA
 
         # Current actual way-point with an rta
         self.iacwprta = -1
-
         # way-points with an RTA and time window command
         self.rta    = []
 

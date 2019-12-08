@@ -107,7 +107,7 @@ class Simulation:
         if self.mode == Simulation.op:
             bs.traf.update(self.simt, self.simdt)
 
-            # Update metrics
+            # Update xlsx
             self.metric.update()
 
             # Update plugins

@@ -110,7 +110,7 @@ class Area(TrafficArrays):
         self.oldalt[-n:] = traf.alt[-n:]
 
     def update(self):
-        ''' Update flight efficiency metrics
+        ''' Update flight efficiency xlsx
             2D and 3D distance [m], and work done (force*distance) [J] '''
         if self.swtaxi and not self.active:
             return

@@ -2,7 +2,7 @@
 import numpy as np
 import bluesky as bs
 from bluesky.tools.simtime import timed_function
-from bluesky.tools.aero import kts, ft, g0, vtas2cas
+from bluesky.tools.aero import kts, ft, g0, vtas2cas, vtas2mach, crossoveralt
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 from bluesky.traffic.performance.legacy.performance import esf, phases, calclimits, PHASE
 from bluesky import settings
@@ -125,6 +125,9 @@ class PerfBADA(TrafficArrays):
 
             # transition altitude for calculation of descent thrust
             self.hpdes       = np.array([])   # [m]
+
+            # mach transition altitude for calculation of descent thrust
+            self.hptrans     = np.array([])   # [m]
 
             # Energy Share Factor
             self.ESF         = np.array([])   # [-]
@@ -291,6 +294,9 @@ class PerfBADA(TrafficArrays):
         # transition altitude for calculation of descent thrust
         self.hpdes[-n:]     = coeff.Hp_des * ft
         self.ESF[-n:]       = 1.0  # neutral initialisation
+
+        # transition altitude for calculation of descent thrust
+        self.hptrans[-n:]     = crossoveralt(coeff.CAScl2[1] * kts,coeff.Mcl[1])
 
         # flight phase
         self.phase[-n:]       = PHASE["None"]
@@ -580,6 +586,7 @@ class PerfBADA(TrafficArrays):
                                         self.vmo,              \
                                         self.mmo,              \
                                         bs.traf.M,             \
+                                        # vtas2mach(bs.traf.pilot.tas), \
                                         bs.traf.alt,           \
                                         self.hmaxact,          \
                                         bs.traf.pilot.alt,     \
@@ -590,7 +597,7 @@ class PerfBADA(TrafficArrays):
                                         bs.traf.tas,           \
                                         self.mass,             \
                                         self.ESF,              \
-                                        self.phase)
+                                        self.phase,self.hptrans)
 
         return
 

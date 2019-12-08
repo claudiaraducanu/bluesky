@@ -153,9 +153,9 @@ class Batch(TrafficArrays):
             scenarioFile        = args[0].lower() # relative to the scenario
             daybeforeDeparture  = args[1]
 
-            date, forecast_time, last_analysis_time =    os.path.splitext(scenarioFile)[0].split("_")[-3], \
+            date, forecast_time, last_analysis_time =    os.path.splitext(scenarioFile)[0].split("_")[-4], \
                                                         os.path.splitext(scenarioFile)[0].split("_")[-2], \
-                                                    os.path.splitext(scenarioFile)[0].split("_")[-1]
+                                                        os.path.splitext(scenarioFile)[0].split("_")[-1]
 
             netcdfFile      = glob.glob(settings.wind_path + \
                                        '/ecmwf_pl_{}_{}*{}.nc'.format(date,forecast_time,

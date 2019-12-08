@@ -1,4 +1,4 @@
-""" Airspace metrics plugin. """
+""" Airspace xlsx plugin. """
 import numpy as np
 try:
     from collections.abc import Collection
@@ -191,11 +191,11 @@ class Metrics(TrafficArrays):
                     self.fsd = open('output/density.csv', 'w')
                     self.feff = open('output/efficiency.csv', 'w')
                     # Create the plot if this is the first sector
-                    plotter.plot('metrics.metrics.sectorsd', dt=2.5, title='Static Density',
+                    plotter.plot('xlsx.xlsx.sectorsd', dt=2.5, title='Static Density',
                                 xlabel='Time', ylabel='Aircraft count', fig=1)
-                    plotter.plot('metrics.metrics.sectorconv', dt=2.5, title='Summed Pairwise Convergence',
+                    plotter.plot('xlsx.xlsx.sectorconv', dt=2.5, title='Summed Pairwise Convergence',
                                 xlabel='Time', ylabel='Convergence', fig=2)
-                    self.effplot = plotter.Plot('metrics.metrics.sectoreff', title='Route Efficiency', plot_type='boxplot',
+                    self.effplot = plotter.Plot('xlsx.xlsx.sectoreff', title='Route Efficiency', plot_type='boxplot',
                                 xlabel='Sector', ylabel='Efficiency', fig=3)
                 # Add new area to the sector list, and add an initial inside count of traffic
                 self.sectors.append(name)

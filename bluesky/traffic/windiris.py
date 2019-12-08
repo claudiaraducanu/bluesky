@@ -204,17 +204,15 @@ class WindIris:
                                  bounds_error=True, assume_sorted=True)
         pressure_i = pressure_to_index(pressure)         # pressure index
 
-
         time_to_index = interpolate.interp1d(self.forecasts_time, range(len(self.forecasts_time)),
                                  bounds_error=True, assume_sorted=True)
         time_i = time_to_index(time)         # time index
-
 
         coord = np.vstack((time_i, pressure_i, lat_i, lon_i))
 
         # Interpolation
         north = ndimage.map_coordinates(self.north, coord, order=1, mode='wrap')
-        east = ndimage.map_coordinates(self.east, coord, order=1, mode='wrap')
+        east  = ndimage.map_coordinates(self.east, coord, order=1, mode='wrap')
 
         return north, east
 

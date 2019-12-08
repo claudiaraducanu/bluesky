@@ -119,7 +119,7 @@ class Batch(TrafficArrays):
         elif len(args)  == 1:
 
             scenarioFilePath   = args[0] # relative to the scenario
-
+            scenarioFilePath   = scenarioFilePath.lower()
             files = [ file for file in os.listdir(os.path.join(settings.scenario_path, scenarioFilePath))
                       if file.endswith(".scn") ]
             self.ic = [os.path.join(scenarioFilePath,file) for file in files]

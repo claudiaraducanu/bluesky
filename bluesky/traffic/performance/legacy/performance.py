@@ -18,7 +18,7 @@ Date          :
 
 import numpy as np
 from bluesky.tools.aero import kts, ft, gamma, gamma1, gamma2, R, beta, g0, \
-    vmach2cas
+    vmach2cas,vcas2mach
 
 
 PHASE = {"None":0,
@@ -212,7 +212,7 @@ def esf(alt, M, climb, descent, delspd, selmach):
 #
 #------------------------------------------------------------------------------
 def calclimits(desspd, gs, to_spd, vmin, vmo, mmo, M, alt, hmaxact,
-           desalt, desvs, maxthr, Thr, D, tas, mass, ESF, phase):
+           desalt, desvs, maxthr, Thr, D, tas, mass, ESF, phase, htrans):
 
     # minimum CAS - below crossover (we do not check for minimum Mach)
     limspd      = np.where((desspd < vmin), vmin, -999.)
@@ -221,15 +221,15 @@ def calclimits(desspd, gs, to_spd, vmin, vmo, mmo, M, alt, hmaxact,
     limspd_flag = np.where((desspd < vmin), True, False)
 
     # maximum CAS: below crossover and above crossover
-    limspd      = np.where((desspd > vmo), vmo, limspd )
-    limspd_flag = np.where((desspd > vmo), True, limspd_flag)
+    limspd      = np.where(np.logical_and((desspd > vmo),(alt < htrans)), vmo, limspd )
+    limspd_flag = np.where(np.logical_and((desspd > vmo),(alt < htrans)), True, limspd_flag)
 
     # maximum Mach
-    limspd      = np.where((M > mmo), vmach2cas(mmo, alt), limspd)
-    limspd_flag = np.where((M > mmo), True, limspd_flag)
+    limspd      = np.where(np.logical_and((vcas2mach(desspd,alt) > mmo),(alt > htrans)), vmach2cas(mmo, alt), limspd)
+    limspd_flag = np.where(np.logical_and((vcas2mach(desspd,alt) > mmo),(alt > htrans)), True, limspd_flag)
 
     # remove non-needed limits
-    limspd_flag = np.where((np.abs(desspd-limspd) <0.1), False, limspd_flag)
+    limspd_flag = np.where((np.abs(desspd-limspd) < 0.1), False, limspd_flag)
     limspd      = np.where((limspd_flag==False), -999.,limspd)
 
     # set altitude to max. possible altitude if alt>Hmax

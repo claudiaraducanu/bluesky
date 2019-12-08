@@ -21,7 +21,7 @@ settings.set_variable_defaults(log_path='output')
     Now it is a full module under the sim package
 
     Apparently the creation of this module also called into life the concept of a research area.
-    A research area is something which is not specific to the metrics module and could be used by different modules.
+    A research area is something which is not specific to the xlsx module and could be used by different modules.
     However, the area command in the stack module saves data in the metric instance.
     If the area function and metric module are to be seperatly used, then they should be untangled.
 
@@ -1310,7 +1310,7 @@ class metric_HB():
 
 class Metric():
     """
-    Metric class definition : traffic metrics
+    Metric class definition : traffic xlsx
 
     Methods:
         Metric()                :  constructor
@@ -1324,7 +1324,7 @@ class Metric():
     """
 
     def __init__(self):
-        # Create metrics file
+        # Create xlsx file
         # fname = settings.log_path + \
         #     strftime("%Y-%m-%d-%H-%M-%S-BlueSky-Metrics.txt", gmtime())
         # self.file = open(fname,"w")
@@ -1356,9 +1356,9 @@ class Metric():
         return
 
     def toggle(self, flag, dt=None):
-        """ Toggle metrics module from stack """
+        """ Toggle xlsx module from stack """
         if type(flag) == bool and not flag:
-            # Can toggle metrics off with 'OFF'
+            # Can toggle xlsx off with 'OFF'
             self.metric_number = -1
         else:
             # Otherwise select a metric to run

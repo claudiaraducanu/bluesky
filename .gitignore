@@ -1,9 +1,9 @@
 output
 scenario/ic.scn
 data/cache
-adapt/input/grib/*
-adapt/input/netcdf/*
-adapt/input/ddr/*
+adapt/input/*
+adapt/output/*
+data/netcdf
 data/performance/BADA/*
 !/data/performance/BADA/README.md
 

@@ -104,8 +104,7 @@ class logWpt(TrafficArrays):
 
     def create(self, n=1):
         super(logWpt, self).create(n)
-        self.initial_mass[-n:] = traf.perf.mass
-
+        self.initial_mass[-n:] = traf.perf.mass[-n:]
 
     def log_data(self,idx):
 
